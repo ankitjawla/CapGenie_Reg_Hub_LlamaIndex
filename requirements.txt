@@ -1,0 +1,19 @@
+# Core web framework
+fastapi==0.115.12
+uvicorn[standard]==0.34.0
+python-multipart==0.0.22
+aiofiles==25.1.0
+
+# LlamaIndex / LlamaCloud
+llama-cloud-services==0.6.94
+llama-parse==0.6.94
+llama-index-core==0.14.19
+llama-index-llms-azure-openai==0.5.3
+llama-index-embeddings-azure-openai==0.5.2
+
+# PDF processing
+pypdf==6.9.2
+
+# Utilities
+python-dotenv==1.2.2
+httpx==0.28.1

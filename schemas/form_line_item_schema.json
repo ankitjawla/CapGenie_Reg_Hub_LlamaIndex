@@ -1,0 +1,90 @@
+{
+  "type": "object",
+  "properties": {
+    "line_item_number": {
+      "description": "The line item reference number exactly as it appears on the form. Examples: '1.a.(1)(a)', '5.d.(6)', '7.c.(2)', '10.', 'M.7.k.'. Preserve the exact formatting including dots, parentheses, and prefixes like 'M.' for memoranda items.",
+      "type": "string"
+    },
+    "description": {
+      "description": "The full text description of the line item as it appears on the form. Include the complete description even if it spans multiple lines. Examples: 'Loans secured by 1-4 family residential properties', 'Income from other insurance activities', 'Change in net unrealized holding gains (losses) on equity securities not held for trading'. Do not include dot leaders or footnote references.",
+      "type": "string"
+    },
+    "mdrm_code": {
+      "description": "The MDRM identifier code for this line item. This is a 4-character alphanumeric code that uniquely identifies the data field. Examples: '4435', 'B488', 'HT69', 'C886', 'KX46'. Extract only the 4-character code, not the prefix.",
+      "type": "string"
+    },
+    "mdrm_prefix": {
+      "description": "The prefix before the MDRM code indicating the reporting entity type. Common values: 'BHCK' (bank holding company, domestic), 'BHDM' (domestic offices), 'BHFN' (foreign offices), 'BHTX' (text field), 'BHOD' (other domestic). If not explicitly shown, it is typically 'BHCK'.",
+      "type": "string"
+    },
+    "data_type": {
+      "description": "The type of data this line item captures. Infer from context: 'dollar' for amounts in thousands, 'percentage' for ratios or rates, 'count' for number of employees or items, 'text' for open text fields, 'yes_no' for binary indicators (0=No, 1=Yes), 'date' for date fields.",
+      "type": "string"
+    },
+    "parent_line_item": {
+      "description": "The line item number of the parent category this item belongs to. For example, item '1.a.(1)(a)' has parent '1.a.(1)', which has parent '1.a.', which has parent '1.'. Top-level items (like '1.', '2.', '3.') should have null. This captures the hierarchy of the schedule.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "is_total_or_subtotal": {
+      "description": "True if this line item is a computed total or subtotal (e.g., 'Total interest income (sum of items 1.a through 1.g)', 'Net income (loss)'). False for individual data entry fields.",
+      "type": "boolean"
+    },
+    "schedule_name": {
+      "description": "The name of the schedule this line item belongs to. Examples: 'Schedule HI', 'Schedule HC-B', 'Schedule HC-R'. Use the official schedule designation as printed in the form header.",
+      "type": "string"
+    },
+    "section": {
+      "description": "The section or part within the schedule, if applicable. Examples: 'Part I', 'Part II', 'Memoranda', 'Column A', 'Column B'. Null if the schedule is not divided into sections.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reporting_threshold": {
+      "description": "Any asset-size or other reporting threshold that determines whether this line item must be completed. Examples: 'Total assets $5 billion or more', 'Total assets $100 billion or more', 'Advanced approaches holding companies only'. Null if no threshold applies (i.e., all filers must report).",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "footnotes": {
+      "description": "Any footnote references associated with this line item, captured as the footnote text (not just the number). Examples: ['To be completed by holding companies with $5 billion or more in total assets']. Null if no footnotes.",
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "line_item_number",
+    "description",
+    "mdrm_code",
+    "mdrm_prefix",
+    "data_type",
+    "is_total_or_subtotal",
+    "schedule_name"
+  ],
+  "additionalProperties": false
+}

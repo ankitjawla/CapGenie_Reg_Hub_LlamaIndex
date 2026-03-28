@@ -1,0 +1,43 @@
+# Environment and secrets (never commit)
+.env
+.env.local
+.env.*.local
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# App runtime artifacts
+.cache/
+results/
+uploads/
+
+# Local FR Y-9C filing PDFs (place in project root for default run; not tracked)
+FR_Y-9C*_f.pdf
+FR_Y-9C*_i.pdf
+
+# Walkthrough PDF at repo root (optional local copy)
+/FRY9C_Extraction_Walkthrough.pdf
+
+# Reference package (guides, sample PDFs/JSON) — keep locally, do not commit
+FRY9C_Package_for_Ankit-2/
+FRY9C_Package_for_Ankit/

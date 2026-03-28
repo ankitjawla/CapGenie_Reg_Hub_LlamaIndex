@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FRY9C Instruction Line Item",
+  "description": "Schema for extracting instruction text for a single line item from an FRY9C instruction document. Each entry pairs a line item reference with its full regulatory instruction text, enabling matching back to the corresponding form line item via MDRM code.",
+  "type": "object",
+  "properties": {
+    "line_item_number": {
+      "type": "string",
+      "description": "The line item reference number this instruction applies to, exactly as it appears. Examples: '1.a.(1)(a)', '5.d.(6)', '7.c.(2)', 'Item 1.a', 'Memorandum item 7'. Preserve the exact formatting to enable matching to the form."
+    },
+    "mdrm_code": {
+      "anyOf": [{"type": "string"}, {"type": "null"}],
+      "description": "The MDRM identifier code referenced in the instruction text, if present. This is a 4-character alphanumeric code (e.g., '4435', 'B488', 'HT69'). Some instruction sections reference the MDRM explicitly; others do not. Null if no MDRM code is mentioned."
+    },
+    "mdrm_prefix": {
+      "anyOf": [{"type": "string"}, {"type": "null"}],
+      "description": "The prefix before the MDRM code (e.g., 'BHCK', 'BHDM'), if mentioned in the instruction text. Null if not referenced."
+    },
+    "line_item_title": {
+      "type": "string",
+      "description": "The short title or name of the line item as stated in the instruction heading. Examples: 'Interest and fee income on loans', 'Loans secured by 1-4 family residential properties', 'Net income (loss)'. This is typically the bold or emphasized text at the start of the instruction section."
+    },
+    "instruction_text": {
+      "type": "string",
+      "description": "The complete instruction text for this line item. Include all paragraphs, guidance, definitions, cross-references to other schedules, and reporting rules. Preserve the full text as written. This is the primary content that banks use to understand what and how to report for this field."
+    },
+    "schedule_name": {
+      "type": "string",
+      "description": "The schedule this instruction belongs to. Examples: 'Schedule HI', 'Schedule HC-B', 'Schedule HC-R'. Use the official schedule designation from the page header."
+    },
+    "cross_references": {
+      "anyOf": [{"type": "array", "items": {"type": "string"}}, {"type": "null"}],
+      "description": "References to other schedules, line items, or glossary entries mentioned in the instruction text. Examples: ['Schedule HI-B, Part II, item 7', 'Glossary entry for Allowance for Credit Losses', 'Schedule HC, item 12']. Null if no cross-references."
+    },
+    "reporting_guidance": {
+      "anyOf": [{"type": "string"}, {"type": "null"}],
+      "description": "Any specific reporting conditions, thresholds, or exceptions mentioned. Examples: 'Report only if total consolidated assets are $5 billion or more', 'Not applicable for savings and loan holding companies', 'Report on a calendar year-to-date basis'. Null if no special reporting conditions."
+    },
+    "effective_date": {
+      "anyOf": [{"type": "string"}, {"type": "null"}],
+      "description": "The effective date of this instruction version, typically shown in the page footer. Format: MM/YYYY. Examples: '03/2024', '12/2024'. Null if not visible."
+    }
+  },
+  "required": ["line_item_number", "line_item_title", "instruction_text", "schedule_name"]
+}
