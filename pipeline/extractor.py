@@ -7,12 +7,18 @@ LlamaExtract: AsyncLlamaCloud.extraction.extract() — concurrent across schedul
 Both steps are backed by a versioned disk cache (parse tier/version + extract config).
 The SDK handles retries internally (configurable via max_retries). parse_pdf runs
 asyncio.run() from a worker thread (see app.py), not nested under uvicorn's loop.
+
+IMPORTANT: Exceptions in _extract_batch_async are now surfaced via the progress
+callback and logged to stderr. Failures appear as "error" status events in
+status.json instead of being silently dropped as empty results.
 """
 
 import asyncio
 import json
 import os
+import sys
 import time
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Literal
@@ -182,7 +188,9 @@ async def _extract_one_async(
     )
 
     records = _unwrap_run_data(run)
-    save_extract_cache(pdf_path, schema_path, records, cfg_fp)
+
+    if records:
+        save_extract_cache(pdf_path, schema_path, records, cfg_fp)
 
     return ExtractResult(
         records=records,
@@ -199,21 +207,33 @@ async def _extract_batch_async(
     """
     Run extraction for all (pdf, schema, kind, label) tuples concurrently.
     Returns {schedule_label: ExtractResult}.
+
+    Exceptions are now surfaced via progress_cb and logged to stderr rather than
+    silently dropped. Each failed schedule is stored as an empty ExtractResult so
+    the pipeline can continue, but the error is visible in status.json.
     """
     async def _run_one(pdf: Path, schema: Path, kind, label: str):
-        result = await _extract_one_async(pdf, schema, kind, label)
-        if progress_cb:
-            progress_cb(label, kind, result)
-        return label, result
+        try:
+            result = await _extract_one_async(pdf, schema, kind, label)
+            if progress_cb:
+                progress_cb(label, kind, result)
+            return label, result
+        except Exception as exc:
+            tb = traceback.format_exc()
+            print(
+                f"[LlamaExtract ERROR] {label} ({kind}): {exc}\n{tb}",
+                file=sys.stderr,
+                flush=True,
+            )
+            if progress_cb:
+                progress_cb(label, kind, exc)
+            return label, ExtractResult(records=[], items=0, elapsed_s=0.0, from_cache=False)
 
     coros = [_run_one(pdf, schema, kind, label) for pdf, schema, kind, label in tasks]
-    results = await asyncio.gather(*coros, return_exceptions=True)
+    results = await asyncio.gather(*coros)
 
     out: dict[str, ExtractResult] = {}
-    for item in results:
-        if isinstance(item, Exception):
-            continue
-        label, result = item
+    for label, result in results:
         out[label] = result
     return out
 

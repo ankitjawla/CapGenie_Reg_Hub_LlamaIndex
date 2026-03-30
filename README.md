@@ -4,6 +4,8 @@ FastAPI web app that ingests **FR Y-9C Form** and **Instruction** PDFs, runs **L
 
 The FRY9C reference package (Extraction Guide, walkthrough, sample PDFs/JSON) is **not** in this repository. Add a local folder such as `FRY9C_Package_for_Ankit-2/` if you use those materials (that path is gitignored).
 
+**How it works (architecture, pipeline, caching):** see [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
+
 ---
 
 ## What's new (latest iteration)
@@ -64,7 +66,9 @@ uvicorn app:app --reload
 ## Project layout
 
 ```
-main.py                      # FastAPI entrypoint, SSE streaming, job management
+app.py                       # FastAPI entrypoint, SSE streaming, job management
+docs/
+  HOW_IT_WORKS.md            # Architecture and pipeline walkthrough
 pipeline/
   cache.py                   # Disk-based SHA-256 content-addressed cache (parse + extract)
   extract_settings.py        # LlamaExtract config: mode/model resolution, system prompts

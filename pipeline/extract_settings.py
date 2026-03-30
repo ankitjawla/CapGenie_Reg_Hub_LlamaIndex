@@ -3,15 +3,25 @@ LlamaExtract configuration aligned with the FRY9C Extraction Guide (LlamaCloud).
 
 Model / mode resolution
 -----------------------
-When **Azure OpenAI** is configured (endpoint + API key), extraction defaults to
-**PREMIUM** with ``extract_model`` = ``AZURE_OPENAI_DEPLOYMENT`` or **gpt-5.4**.
+LlamaCloud PREMIUM mode uses its own model routing with LlamaCloud-specific slugs
+(e.g. "openai-gpt-4-1"). Azure OpenAI deployment names (e.g. "gpt-5.4") are NOT
+valid LlamaCloud extract model identifiers and will be rejected server-side.
 
-Otherwise: ``LLAMA_EXTRACT_MODE`` (default MULTIMODAL) and optional
-``LLAMA_EXTRACT_MODEL`` / ``AZURE_OPENAI_DEPLOYMENT`` for PREMIUM.
+Resolution order for extract_model:
+  1. ``LLAMA_EXTRACT_MODEL`` — must be a valid LlamaCloud slug (e.g. "openai-gpt-4-1")
+  2. Fall back to ``LLAMACLOUD_DEFAULT_EXTRACT_MODEL`` ("openai-gpt-4-1")
+
+Mode resolution:
+  - PREMIUM when ``LLAMA_EXTRACT_MODEL`` is set or ``LLAMA_EXTRACT_MODE=PREMIUM``
+  - Otherwise MULTIMODAL (LlamaCloud default; handles visually-rich FR Y-9C schedules)
+
+Azure OpenAI credentials in the environment (AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY,
+AZURE_OPENAI_DEPLOYMENT) are for direct Azure OpenAI usage elsewhere in the app and are
+deliberately NOT used to configure LlamaCloud extraction.
 
 Best practices applied:
-  - PREMIUM mode when a model is explicitly configured (only mode that allows it)
-  - MULTIMODAL when no model override (handles visually rich FR Y-9C schedules)
+  - PREMIUM mode with openai-gpt-4-1 (extract) + anthropic-haiku-4.5 (parse) for dense tables
+  - MULTIMODAL for visually-rich schedules when no extract model is explicitly configured
   - confidence_scores + cite_sources enabled for auditability
   - chunk_mode: SECTION for instruction PDFs, PAGE for form PDFs
   - num_pages_context per schedule size class (see num_pages_context_for_schedule)
@@ -31,12 +41,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Default Azure OpenAI **deployment name** when credentials are set but
-# AZURE_OPENAI_DEPLOYMENT / LLAMA_EXTRACT_MODEL are empty.
-DEFAULT_AZURE_DEPLOYMENT = "gpt-5.4"
+# Default LlamaCloud extract model slug for PREMIUM mode.
+# Valid options: "openai-gpt-4-1", "openai-gpt-5-mini", "openai-gpt-5"
+# NOTE: Azure deployment names (e.g. "gpt-5.4") are NOT valid here.
+LLAMACLOUD_DEFAULT_EXTRACT_MODEL = "openai-gpt-4-1"
 
-# LlamaCloud-hosted PREMIUM slug when user forces PREMIUM without Azure and without a model.
-LLAMACLOUD_PREMIUM_FALLBACK_MODEL = "openai-gpt-4-1"
+# Default LlamaCloud parse model slug for PREMIUM mode (no extra credits).
+# This is the PREMIUM default — provides advanced OCR + complex table detection.
+LLAMACLOUD_DEFAULT_PARSE_MODEL = "anthropic-haiku-4.5"
 
 _VALID_MODES = {"FAST", "BALANCED", "MULTIMODAL", "PREMIUM"}
 
@@ -64,48 +76,34 @@ def resolve_extract_mode() -> str:
     return mode
 
 
-def _azure_openai_credentials_present() -> bool:
-    """True when Azure OpenAI env looks usable (endpoint + key)."""
-    ep = os.environ.get("AZURE_OPENAI_ENDPOINT", "").strip()
-    key = (
-        os.environ.get("AZURE_OPENAI_API_KEY", "").strip()
-        or os.environ.get("AZURE_OPENAI_KEY", "").strip()
-    )
-    return bool(ep and key)
-
-
 def resolve_extract_model() -> str:
     """
-    Resolve ``extract_model`` (deployment name or LlamaCloud PREMIUM slug).
+    Resolve the LlamaCloud extract model slug.
 
-    Order:
-      1. ``LLAMA_EXTRACT_MODEL``
-      2. ``AZURE_OPENAI_DEPLOYMENT``
-      3. If Azure credentials are present → ``DEFAULT_AZURE_DEPLOYMENT`` (``gpt-5.4``)
-      4. LlamaCloud PREMIUM fallback slug (when PREMIUM is chosen without Azure)
+    Resolution order:
+      1. ``LLAMA_EXTRACT_MODEL`` env var — must be a valid LlamaCloud slug
+         (e.g. "openai-gpt-4-1", "openai-gpt-5-mini", "openai-gpt-5")
+      2. ``LLAMACLOUD_DEFAULT_EXTRACT_MODEL`` ("openai-gpt-4-1")
+
+    Azure OpenAI deployment names (e.g. "gpt-5.4") are NOT valid here.
     """
     explicit = os.environ.get("LLAMA_EXTRACT_MODEL", "").strip()
     if explicit:
         return explicit
-    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "").strip()
-    if deployment:
-        return deployment
-    if _azure_openai_credentials_present():
-        return DEFAULT_AZURE_DEPLOYMENT
-    return LLAMACLOUD_PREMIUM_FALLBACK_MODEL
+    return LLAMACLOUD_DEFAULT_EXTRACT_MODEL
 
 
 def _effective_mode() -> str:
     """
     Return the mode that will actually be used:
-    - PREMIUM if an extract model path is configured (explicit, deployment, or Azure creds)
-    - Otherwise → ``LLAMA_EXTRACT_MODE`` (default MULTIMODAL)
+    - PREMIUM when ``LLAMA_EXTRACT_MODEL`` is explicitly set (extract model implies PREMIUM)
+    - PREMIUM when ``LLAMA_EXTRACT_MODE=PREMIUM`` is explicitly set
+    - Otherwise → MULTIMODAL (LlamaCloud default; good for visually-rich FR Y-9C schedules)
     """
-    if (
-        os.environ.get("LLAMA_EXTRACT_MODEL", "").strip()
-        or os.environ.get("AZURE_OPENAI_DEPLOYMENT", "").strip()
-        or _azure_openai_credentials_present()
-    ):
+    if os.environ.get("LLAMA_EXTRACT_MODEL", "").strip():
+        return "PREMIUM"
+    configured = os.getenv("LLAMA_EXTRACT_MODE", "").strip().upper()
+    if configured == "PREMIUM":
         return "PREMIUM"
     return resolve_extract_mode()
 
@@ -114,7 +112,10 @@ def build_extract_config(kind: Literal["form", "instruction"]) -> dict:
     """
     Build an ``ExtractConfigParam``-compatible dict for LlamaExtract.
 
-    Uses PREMIUM mode when an extract model is explicitly configured, MULTIMODAL otherwise.
+    Uses PREMIUM mode (with openai-gpt-4-1 + anthropic-haiku-4.5) when
+    ``LLAMA_EXTRACT_MODEL`` or ``LLAMA_EXTRACT_MODE=PREMIUM`` is configured,
+    otherwise MULTIMODAL.
+
     Differences by kind:
       - form:        chunk_mode=PAGE (table-heavy; each page processed independently)
       - instruction: chunk_mode=SECTION (narrative; semantic section boundaries)
@@ -136,6 +137,7 @@ def build_extract_config(kind: Literal["form", "instruction"]) -> dict:
 
     if mode == "PREMIUM":
         cfg["extract_model"] = resolve_extract_model()
+        cfg["parse_model"] = LLAMACLOUD_DEFAULT_PARSE_MODEL
 
     return cfg
 

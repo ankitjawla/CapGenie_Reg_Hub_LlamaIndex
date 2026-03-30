@@ -24,7 +24,7 @@ from typing import Any, Callable
 
 import os
 from pipeline.extractor import extract_schedules_batch, parse_pdf, ExtractResult
-from pipeline.extract_settings import resolve_extract_model, resolve_extract_mode
+from pipeline.extract_settings import resolve_extract_model, resolve_extract_mode, build_extract_config
 from pipeline.matcher import build_combined_output, save_combined_output
 from pipeline.splitter import get_schedule_names, split_pdf_by_schedule
 
@@ -235,12 +235,14 @@ def run_pipeline(
         total_schedules = len(form_schedules) or 1
 
         _extract_model = resolve_extract_model()
+        _form_cfg = build_extract_config("form")
         emit(3, "Extract Forms", "", "running",
              f"Extracting structured data from {total_schedules} form schedule PDFs…", 20.0, {
-                 "what": "LlamaExtract (guide): PER_TABLE_ROW + BALANCED, SECTION chunking, high_resolution_mode, use_reasoning, num_pages_context=1, form system prompt. Schema: line_item_number, description, mdrm_code, mdrm_prefix, data_type, parent_line_item, is_total_or_subtotal, schedule_name, section, reporting_threshold, footnotes.",
+                 "what": "LlamaExtract: PER_TABLE_ROW, chunk_mode=PAGE, high_resolution_mode, use_reasoning, cite_sources. Schema: line_item_number, description, mdrm_code, mdrm_prefix, data_type, parent_line_item, is_total_or_subtotal, schedule_name, section, reporting_threshold, footnotes.",
                  "schema": "form_line_item_schema.json",
-                 "extract_model": _extract_model,
-                 "extract_mode": resolve_extract_mode(),
+                 "extract_model": _form_cfg.get("extract_model", "mode-default"),
+                 "parse_model": _form_cfg.get("parse_model", "mode-default"),
+                 "extract_mode": _form_cfg.get("extraction_mode"),
                  "total_schedules": total_schedules,
              })
 
@@ -269,19 +271,24 @@ def run_pipeline(
              })
 
         def _form_progress(label, kind, result):
+            is_err = isinstance(result, Exception)
             row = {
                 "schedule": label.replace("Schedule_", ""),
-                "items": result.items if not isinstance(result, Exception) else 0,
-                "elapsed_s": result.elapsed_s if not isinstance(result, Exception) else 0,
-                "from_cache": result.from_cache if not isinstance(result, Exception) else False,
-                "status": "done" if not isinstance(result, Exception) else "error",
+                "items": 0 if is_err else result.items,
+                "elapsed_s": 0 if is_err else result.elapsed_s,
+                "from_cache": False if is_err else result.from_cache,
+                "status": "error" if is_err else ("cached" if result.from_cache else "done"),
+                "error": str(result) if is_err else None,
             }
-            cache_tag = " [CACHED]" if (not isinstance(result, Exception) and result.from_cache) else ""
-            items = result.items if not isinstance(result, Exception) else 0
-            elapsed = result.elapsed_s if not isinstance(result, Exception) else 0
-            emit(3, "Extract Forms", label,
-                 "cached" if (not isinstance(result, Exception) and result.from_cache) else "done",
-                 f"{label}{cache_tag}: {items} items in {_fmt_s(elapsed)}", 30.0, {"row": row})
+            if is_err:
+                emit(3, "Extract Forms", label, "error",
+                     f"{label}: extraction failed — {result}", 30.0, {"row": row})
+            else:
+                cache_tag = " [CACHED]" if result.from_cache else ""
+                emit(3, "Extract Forms", label,
+                     "cached" if result.from_cache else "done",
+                     f"{label}{cache_tag}: {result.items} items in {_fmt_s(result.elapsed_s)}",
+                     30.0, {"row": row})
 
         form_batch = extract_schedules_batch(form_tasks, _form_progress)
 
@@ -367,19 +374,24 @@ def run_pipeline(
              })
 
         def _instr_progress(label, kind, result):
+            is_err = isinstance(result, Exception)
             row = {
                 "schedule": label.replace("Schedule_", ""),
-                "items": result.items if not isinstance(result, Exception) else 0,
-                "elapsed_s": result.elapsed_s if not isinstance(result, Exception) else 0,
-                "from_cache": result.from_cache if not isinstance(result, Exception) else False,
-                "status": "done" if not isinstance(result, Exception) else "error",
+                "items": 0 if is_err else result.items,
+                "elapsed_s": 0 if is_err else result.elapsed_s,
+                "from_cache": False if is_err else result.from_cache,
+                "status": "error" if is_err else ("cached" if result.from_cache else "done"),
+                "error": str(result) if is_err else None,
             }
-            cache_tag = " [CACHED]" if (not isinstance(result, Exception) and result.from_cache) else ""
-            items = result.items if not isinstance(result, Exception) else 0
-            elapsed = result.elapsed_s if not isinstance(result, Exception) else 0
-            emit(4, "Extract Instructions", label,
-                 "cached" if (not isinstance(result, Exception) and result.from_cache) else "done",
-                 f"{label}{cache_tag}: {items} items in {_fmt_s(elapsed)}", 60.0, {"row": row})
+            if is_err:
+                emit(4, "Extract Instructions", label, "error",
+                     f"{label}: extraction failed — {result}", 60.0, {"row": row})
+            else:
+                cache_tag = " [CACHED]" if result.from_cache else ""
+                emit(4, "Extract Instructions", label,
+                     "cached" if result.from_cache else "done",
+                     f"{label}{cache_tag}: {result.items} items in {_fmt_s(result.elapsed_s)}",
+                     60.0, {"row": row})
 
         instr_batch = extract_schedules_batch(instr_tasks, _instr_progress)
 
