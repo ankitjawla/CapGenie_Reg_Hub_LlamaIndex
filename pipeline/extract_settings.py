@@ -3,9 +3,11 @@ LlamaExtract configuration aligned with the FRY9C Extraction Guide (LlamaCloud).
 
 Model / mode resolution
 -----------------------
-LLAMA_EXTRACT_MODE env  → MULTIMODAL (default) or PREMIUM / BALANCED / FAST
-LLAMA_EXTRACT_MODEL env → explicit slug (only effective in PREMIUM mode)
-                          Falls back to AZURE_OPENAI_DEPLOYMENT, then guide default.
+When **Azure OpenAI** is configured (endpoint + API key), extraction defaults to
+**PREMIUM** with ``extract_model`` = ``AZURE_OPENAI_DEPLOYMENT`` or **gpt-5.4**.
+
+Otherwise: ``LLAMA_EXTRACT_MODE`` (default MULTIMODAL) and optional
+``LLAMA_EXTRACT_MODEL`` / ``AZURE_OPENAI_DEPLOYMENT`` for PREMIUM.
 
 Best practices applied:
   - PREMIUM mode when a model is explicitly configured (only mode that allows it)
@@ -29,7 +31,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DEFAULT_GUIDE_EXTRACT_MODEL = "openai-gpt-4-1"
+# Default Azure OpenAI **deployment name** when credentials are set but
+# AZURE_OPENAI_DEPLOYMENT / LLAMA_EXTRACT_MODEL are empty.
+DEFAULT_AZURE_DEPLOYMENT = "gpt-5.4"
+
+# LlamaCloud-hosted PREMIUM slug when user forces PREMIUM without Azure and without a model.
+LLAMACLOUD_PREMIUM_FALLBACK_MODEL = "openai-gpt-4-1"
+
 _VALID_MODES = {"FAST", "BALANCED", "MULTIMODAL", "PREMIUM"}
 
 FORM_SYSTEM_PROMPT = (
@@ -56,12 +64,25 @@ def resolve_extract_mode() -> str:
     return mode
 
 
+def _azure_openai_credentials_present() -> bool:
+    """True when Azure OpenAI env looks usable (endpoint + key)."""
+    ep = os.environ.get("AZURE_OPENAI_ENDPOINT", "").strip()
+    key = (
+        os.environ.get("AZURE_OPENAI_API_KEY", "").strip()
+        or os.environ.get("AZURE_OPENAI_KEY", "").strip()
+    )
+    return bool(ep and key)
+
+
 def resolve_extract_model() -> str:
     """
-    Resolve ``extract_model`` slug.
+    Resolve ``extract_model`` (deployment name or LlamaCloud PREMIUM slug).
 
-    Order: ``LLAMA_EXTRACT_MODEL`` → ``AZURE_OPENAI_DEPLOYMENT`` → guide default.
-    Only meaningful when extraction_mode is PREMIUM.
+    Order:
+      1. ``LLAMA_EXTRACT_MODEL``
+      2. ``AZURE_OPENAI_DEPLOYMENT``
+      3. If Azure credentials are present → ``DEFAULT_AZURE_DEPLOYMENT`` (``gpt-5.4``)
+      4. LlamaCloud PREMIUM fallback slug (when PREMIUM is chosen without Azure)
     """
     explicit = os.environ.get("LLAMA_EXTRACT_MODEL", "").strip()
     if explicit:
@@ -69,20 +90,22 @@ def resolve_extract_model() -> str:
     deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "").strip()
     if deployment:
         return deployment
-    return DEFAULT_GUIDE_EXTRACT_MODEL
+    if _azure_openai_credentials_present():
+        return DEFAULT_AZURE_DEPLOYMENT
+    return LLAMACLOUD_PREMIUM_FALLBACK_MODEL
 
 
 def _effective_mode() -> str:
     """
     Return the mode that will actually be used:
-    - If an explicit extract model is configured → PREMIUM (only mode that accepts it)
-    - Otherwise → whatever LLAMA_EXTRACT_MODE says (default MULTIMODAL)
+    - PREMIUM if an extract model path is configured (explicit, deployment, or Azure creds)
+    - Otherwise → ``LLAMA_EXTRACT_MODE`` (default MULTIMODAL)
     """
-    model_explicitly_set = bool(
+    if (
         os.environ.get("LLAMA_EXTRACT_MODEL", "").strip()
         or os.environ.get("AZURE_OPENAI_DEPLOYMENT", "").strip()
-    )
-    if model_explicitly_set:
+        or _azure_openai_credentials_present()
+    ):
         return "PREMIUM"
     return resolve_extract_mode()
 
