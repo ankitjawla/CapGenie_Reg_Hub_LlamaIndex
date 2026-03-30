@@ -182,6 +182,54 @@ def save_extract_cache(
 
 
 # ---------------------------------------------------------------------------
+# Cache migration / integrity
+# ---------------------------------------------------------------------------
+
+def _purge_orphaned_entries() -> dict[str, int]:
+    """
+    Remove cache entries written by older code versions that are invisible to
+    the current key-computation logic.
+
+    Parse entries without ``parse_profile`` use the old (no-fingerprint) key
+    and will never match the current ``parse_cache_key()``.
+
+    Extract entries without ``extract_config_fingerprint`` use the old key
+    and will never match the current ``extract_cache_key()``.
+
+    Returns counts of deleted entries.
+    """
+    deleted: dict[str, int] = {"parse": 0, "extract": 0}
+
+    if PARSE_CACHE.exists():
+        for meta_f in list(PARSE_CACHE.glob("*.meta.json")):
+            try:
+                m = json.loads(meta_f.read_text())
+                if "parse_profile" not in m:
+                    stem = meta_f.stem.replace(".meta", "")
+                    txt = PARSE_CACHE / f"{stem}.txt"
+                    meta_f.unlink(missing_ok=True)
+                    txt.unlink(missing_ok=True)
+                    deleted["parse"] += 1
+            except Exception:
+                pass
+
+    if EXTRACT_CACHE.exists():
+        for meta_f in list(EXTRACT_CACHE.glob("*.meta.json")):
+            try:
+                m = json.loads(meta_f.read_text())
+                if "extract_config_fingerprint" not in m:
+                    stem = meta_f.stem.replace(".meta", "")
+                    data = EXTRACT_CACHE / f"{stem}.json"
+                    meta_f.unlink(missing_ok=True)
+                    data.unlink(missing_ok=True)
+                    deleted["extract"] += 1
+            except Exception:
+                pass
+
+    return deleted
+
+
+# ---------------------------------------------------------------------------
 # Cache stats helper
 # ---------------------------------------------------------------------------
 

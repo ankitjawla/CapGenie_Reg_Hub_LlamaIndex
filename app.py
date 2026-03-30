@@ -41,6 +41,7 @@ from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from pipeline.cache import _purge_orphaned_entries
 from pipeline.processor import ProgressEvent, run_pipeline
 
 load_dotenv()
@@ -56,6 +57,17 @@ STATIC_DIR = BASE_DIR / "static"
 
 for _d in (UPLOADS_DIR, RESULTS_DIR, STATIC_DIR):
     _d.mkdir(exist_ok=True)
+
+# Purge any cache entries written by older code versions (mismatched key format).
+# This is idempotent and fast (only reads meta JSON files).
+_purged = _purge_orphaned_entries()
+if _purged["parse"] or _purged["extract"]:
+    import logging as _logging
+    _logging.getLogger(__name__).info(
+        "Cache migration: removed %d orphaned parse + %d orphaned extract entries.",
+        _purged["parse"],
+        _purged["extract"],
+    )
 
 # ---------------------------------------------------------------------------
 # In-memory event bus (job_id → list of SSE strings)

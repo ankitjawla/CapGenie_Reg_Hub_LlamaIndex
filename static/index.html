@@ -1,845 +1,364 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>FRY9C Extraction</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config={darkMode:'class'}</script>
   <style>
     ::-webkit-scrollbar{width:5px;height:5px}
     ::-webkit-scrollbar-track{background:#f1f5f9}
     ::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:3px}
-
+    .dark ::-webkit-scrollbar-track{background:#1e293b}
+    .dark ::-webkit-scrollbar-thumb{background:#475569}
     @keyframes spin{to{transform:rotate(360deg)}}
     .spin{animation:spin 1s linear infinite}
-
     @keyframes pulse-ring{0%{transform:scale(.9);opacity:.8}70%{transform:scale(1.2);opacity:0}100%{transform:scale(.9);opacity:0}}
     .pulse-ring::before{content:'';position:absolute;inset:-5px;border-radius:9999px;background:#3b82f6;animation:pulse-ring 1.5s ease-out infinite;z-index:-1}
     .pulse-ring{position:relative;z-index:0}
-
     @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
     .fade-up{animation:fadeUp .3s ease}
-
     @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
     .shimmer{background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:200%;animation:shimmer 1.5s infinite}
-
     .drop-active{border-color:#3b82f6!important;background:#eff6ff!important}
     .instr-clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
     .instr-clamp.open{-webkit-line-clamp:unset;display:block}
     .step-card{transition:all .25s ease}
     .step-card.active{box-shadow:0 0 0 2px #3b82f6}
     .tab-active{background:#2563eb!important;color:#fff!important;border-color:#2563eb!important}
+    /* dark */
+    .dark body{background-color:#0f172a;color:#e2e8f0}
+    .dark header{background-color:#1e293b!important;border-color:#334155!important}
+    .dark .bg-white{background-color:#1e293b!important}
+    .dark .bg-slate-50{background-color:#0f172a!important}
+    .dark .bg-slate-100{background-color:#263044!important}
+    .dark .bg-slate-900{background-color:#020617!important}
+    .dark .border-slate-200,.dark .border-slate-100{border-color:#334155!important}
+    .dark .text-slate-900,.dark .text-slate-800{color:#f1f5f9!important}
+    .dark .text-slate-700,.dark .text-slate-600{color:#cbd5e1!important}
+    .dark .text-slate-500,.dark .text-slate-400{color:#94a3b8!important}
+    .dark select,.dark input[type=text]{background-color:#1e293b!important;color:#e2e8f0!important;border-color:#334155!important}
+    .dark thead{background-color:#1e293b!important}
+    .dark tbody tr:hover td{background-color:#263044!important}
+    .dark .step-card{background-color:#1e293b!important;border-color:#334155!important}
+    .dark .bg-blue-50{background-color:#172554!important}
+    .dark .bg-emerald-50{background-color:#022c22!important}
+    .dark .bg-amber-50{background-color:#2d1a00!important}
+    .dark #rowDrawer{background-color:#1e293b!important;color:#e2e8f0}
+    .dark #rowDrawer .border-slate-100{border-color:#334155!important}
+    .dark #rowDrawer .text-slate-400{color:#94a3b8!important}
+    .dark #rowDrawer .text-slate-700{color:#cbd5e1!important}
+    .dark details summary:hover{background-color:#263044!important}
+    /* drawer */
+    #rowDrawer{position:fixed;top:0;right:0;bottom:0;width:500px;max-width:95vw;background:white;z-index:60;overflow-y:auto;transform:translateX(110%);transition:transform .3s cubic-bezier(.4,0,.2,1);box-shadow:-4px 0 40px rgba(0,0,0,.18)}
+    #rowDrawer.open{transform:translateX(0)}
+    #drawerOverlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:59;display:none;cursor:pointer}
+    #drawerOverlay.open{display:block}
+    /* sort */
+    th.sort-th{cursor:pointer;user-select:none;white-space:nowrap}
+    th.sort-th:hover{background-color:#e2e8f0}
+    .dark th.sort-th:hover{background-color:#334155!important}
+    .sort-ind{opacity:.55;font-size:.65em;margin-left:2px}
+    /* sticky thead */
+    .sticky-thead{position:sticky;top:0;z-index:20}
+    /* depth indent */
+    .d1{padding-left:1.2rem!important}.d2{padding-left:2.4rem!important}.d3{padding-left:3.6rem!important}
+    .d4{padding-left:4.8rem!important}.d5{padding-left:6.0rem!important}
+    /* table scroll */
+    #tableScroll{max-height:600px;overflow-y:auto}
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen">
-
-<!-- HEADER -->
 <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
   <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3">
       <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shrink-0">
-        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0121 9.414V19a2 2 0 01-2 2z"/>
-        </svg>
+        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0121 9.414V19a2 2 0 01-2 2z"/></svg>
       </div>
       <div>
         <span class="font-semibold text-slate-900">FRY9C Extraction</span>
         <span class="hidden sm:inline text-slate-400 text-xs ml-2">FR Y-9C Regulatory Data Pipeline</span>
       </div>
     </div>
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2">
       <div id="cacheTag" class="hidden text-xs bg-amber-50 border border-amber-200 text-amber-700 px-2 py-1 rounded-full font-medium"></div>
-      <button id="btnNewJob" class="hidden text-sm text-blue-600 hover:text-blue-800 font-medium" onclick="showUpload()">← New Job</button>
+      <button id="btnNewJob" class="hidden text-sm text-blue-600 hover:text-blue-800 font-medium px-2" onclick="showUpload()">&#8592; New Job</button>
+      <button onclick="toggleDarkMode()" title="Toggle dark mode" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 transition-colors text-lg"><span id="darkIcon">&#127769;</span></button>
     </div>
   </div>
 </header>
-
 <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
 
-<!-- ═══════════════════════════════════════════════════════════
-     UPLOAD SECTION
-═══════════════════════════════════════════════════════════ -->
 <section id="sectionUpload" class="fade-up">
-
   <div class="text-center mb-8">
     <h2 class="text-2xl font-bold text-slate-900">Upload FR Y-9C Documents</h2>
-    <p class="mt-1 text-slate-500 text-sm">Feed both PDFs into the 5-step LlamaParse → LlamaExtract pipeline</p>
+    <p class="mt-1 text-slate-500 text-sm">Feed both PDFs into the 5-step LlamaParse &#8594; LlamaExtract pipeline</p>
   </div>
-
-  <!-- Pipeline overview pills -->
   <div class="flex flex-wrap justify-center gap-2 mb-8 text-xs font-medium">
-    <span class="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full">1 · Parse (LlamaParse)</span>
-    <span class="text-slate-400">→</span>
-    <span class="bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1 rounded-full">2 · Split by Schedule</span>
-    <span class="text-slate-400">→</span>
-    <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1 rounded-full">3 · Extract Forms</span>
-    <span class="text-slate-400">→</span>
-    <span class="bg-violet-50 text-violet-700 border border-violet-200 px-3 py-1 rounded-full">4 · Extract Instructions</span>
-    <span class="text-slate-400">→</span>
-    <span class="bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-full">5 · Match &amp; Combine</span>
+    <span class="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full">1 Parse</span><span class="text-slate-400">&#8594;</span>
+    <span class="bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1 rounded-full">2 Split</span><span class="text-slate-400">&#8594;</span>
+    <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1 rounded-full">3 Extract Forms</span><span class="text-slate-400">&#8594;</span>
+    <span class="bg-violet-50 text-violet-700 border border-violet-200 px-3 py-1 rounded-full">4 Extract Instructions</span><span class="text-slate-400">&#8594;</span>
+    <span class="bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-full">5 Match</span>
   </div>
-
-  <!-- Previous jobs -->
   <div id="prevJobsPanel" class="hidden mb-6">
     <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
       <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Previous Jobs</h3>
-      <div id="prevJobsList" class="space-y-1.5 text-sm"></div>
+      <div id="prevJobsList" class="space-y-1.5"></div>
     </div>
   </div>
-
-  <!-- Drop zones -->
   <div class="grid md:grid-cols-2 gap-5 mb-6">
     <div>
-      <label class="block text-sm font-semibold text-slate-700 mb-2">Form PDF <span class="font-normal text-slate-400">(FR_Y-9C…_f.pdf · ~73 pages)</span></label>
-      <div id="dropForm" class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all"
-        onclick="document.getElementById('inputForm').click()"
-        ondragover="ev(event,'dropForm')" ondragleave="el('dropForm')" ondrop="ed(event,'inputForm','dropForm','lbForm','icForm')">
-        <div id="icForm">
-          <svg class="w-10 h-10 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-          </svg>
-          <p class="text-sm text-slate-500">Drop or <span class="text-blue-600 font-medium">browse</span></p>
-          <p class="text-xs text-slate-400 mt-1">PDF only</p>
-        </div>
+      <label class="block text-sm font-semibold text-slate-700 mb-2">Form PDF <span class="font-normal text-slate-400">(FR_Y-9C&#8230;_f.pdf)</span></label>
+      <div id="dropForm" class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all" onclick="document.getElementById('inputForm').click()" ondragover="ev(event,'dropForm')" ondragleave="el('dropForm')" ondrop="ed(event,'inputForm','dropForm','lbForm','icForm')">
+        <div id="icForm"><svg class="w-10 h-10 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg><p class="text-sm text-slate-500">Drop or <span class="text-blue-600 font-medium">browse</span></p><p class="text-xs text-slate-400 mt-1">PDF only</p></div>
         <p id="lbForm" class="hidden text-sm font-semibold text-blue-700 mt-1"></p>
         <input id="inputForm" type="file" accept=".pdf" class="hidden" onchange="onSel('inputForm','dropForm','lbForm','icForm')"/>
       </div>
     </div>
     <div>
-      <label class="block text-sm font-semibold text-slate-700 mb-2">Instruction PDF <span class="font-normal text-slate-400">(FR_Y-9C…_i.pdf · ~614 pages)</span></label>
-      <div id="dropInstr" class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all"
-        onclick="document.getElementById('inputInstr').click()"
-        ondragover="ev(event,'dropInstr')" ondragleave="el('dropInstr')" ondrop="ed(event,'inputInstr','dropInstr','lbInstr','icInstr')">
-        <div id="icInstr">
-          <svg class="w-10 h-10 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-          </svg>
-          <p class="text-sm text-slate-500">Drop or <span class="text-blue-600 font-medium">browse</span></p>
-          <p class="text-xs text-slate-400 mt-1">PDF only</p>
-        </div>
+      <label class="block text-sm font-semibold text-slate-700 mb-2">Instruction PDF <span class="font-normal text-slate-400">(FR_Y-9C&#8230;_i.pdf)</span></label>
+      <div id="dropInstr" class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all" onclick="document.getElementById('inputInstr').click()" ondragover="ev(event,'dropInstr')" ondragleave="el('dropInstr')" ondrop="ed(event,'inputInstr','dropInstr','lbInstr','icInstr')">
+        <div id="icInstr"><svg class="w-10 h-10 text-slate-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg><p class="text-sm text-slate-500">Drop or <span class="text-blue-600 font-medium">browse</span></p><p class="text-xs text-slate-400 mt-1">PDF only</p></div>
         <p id="lbInstr" class="hidden text-sm font-semibold text-blue-700 mt-1"></p>
         <input id="inputInstr" type="file" accept=".pdf" class="hidden" onchange="onSel('inputInstr','dropInstr','lbInstr','icInstr')"/>
       </div>
     </div>
   </div>
-
-  <!-- Server-side project PDFs (same folder as app.py) -->
   <div id="defaultFilesPanel" class="hidden mb-6">
     <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-5 text-center shadow-sm">
       <p class="text-emerald-900 font-semibold text-sm mb-1">Project PDFs found on server</p>
       <p id="defaultFilesDetail" class="text-xs text-emerald-800 mb-4 font-mono"></p>
-      <button type="button" id="btnProjectPdfs" onclick="startWithProjectPdfs()"
-        class="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow text-sm transition">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-        </svg>
-        Run with project PDFs
+      <button type="button" id="btnProjectPdfs" onclick="startWithProjectPdfs()" class="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow text-sm transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>Run with project PDFs
       </button>
     </div>
   </div>
-
-  <p class="text-center text-xs text-slate-400 mb-4">Results are cached by file hash — re-uploading the same PDF skips the API call entirely</p>
-
+  <p class="text-center text-xs text-slate-400 mb-4">Results are cached by file hash &#8212; re-uploading the same PDF skips the API call entirely</p>
   <div class="text-center">
-    <button id="btnStart" onclick="startExtraction()" disabled
-      class="inline-flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow transition text-sm">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-      </svg>
+    <button id="btnStart" onclick="startExtraction()" disabled class="inline-flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow transition text-sm">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
       Start Extraction
     </button>
     <p id="uploadErr" class="text-red-600 text-sm mt-3 hidden"></p>
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════════════════
-     PROGRESS SECTION
-═══════════════════════════════════════════════════════════ -->
 <section id="sectionProgress" class="hidden fade-up">
-
-  <!-- Header + overall bar -->
   <div class="flex items-start justify-between mb-5 gap-4">
     <div>
       <h2 class="text-xl font-bold text-slate-900">Extraction in Progress</h2>
-      <p id="progressSubtitle" class="text-slate-500 text-sm mt-0.5">Starting…</p>
+      <p id="progressSubtitle" class="text-slate-500 text-sm mt-0.5">Starting&#8230;</p>
     </div>
     <div class="text-right shrink-0">
       <div id="elapsedDisplay" class="text-2xl font-mono font-bold text-slate-700">0:00</div>
       <div class="text-xs text-slate-400">elapsed</div>
+      <div id="etaDisplay" class="hidden text-xs text-blue-600 font-medium mt-0.5"></div>
     </div>
   </div>
-
-  <!-- Overall progress bar -->
   <div class="mb-6">
-    <div class="flex justify-between text-xs text-slate-500 mb-1">
-      <span id="progressLabel">Overall</span>
-      <span id="pctLabel">0%</span>
-    </div>
-    <div class="h-3 bg-slate-100 rounded-full overflow-hidden">
-      <div id="progressBar" class="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-700" style="width:0%"></div>
-    </div>
+    <div class="flex justify-between text-xs text-slate-500 mb-1"><span id="progressLabel">Overall</span><span id="pctLabel">0%</span></div>
+    <div class="h-3 bg-slate-100 rounded-full overflow-hidden"><div id="progressBar" class="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-700" style="width:0%"></div></div>
   </div>
-
-  <!-- 5 Step Cards -->
   <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-6">
-
-    <!-- Step 1 – Parse -->
     <div id="card1" class="step-card bg-white border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-slate-300" onclick="toggleCard(1)">
-      <div class="flex items-center gap-2 mb-2">
-        <div id="dot1" class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">1</div>
-        <span class="text-xs font-semibold text-slate-700">Parse</span>
-        <div id="cacheBadge1" class="hidden ml-auto text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">cached</div>
-      </div>
-      <p class="text-xs text-slate-400">LlamaParse fast mode · PDF → text</p>
-      <div id="detail1" class="hidden mt-3 text-xs space-y-1.5 border-t border-slate-100 pt-3">
-        <div id="parse1detail"></div>
-      </div>
+      <div class="flex items-center gap-2 mb-2"><div id="dot1" class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">1</div><span class="text-xs font-semibold text-slate-700">Parse</span><div id="cacheBadge1" class="hidden ml-auto text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">cached</div></div>
+      <p class="text-xs text-slate-400">LlamaParse agentic &#183; PDF &#8594; text</p>
+      <div id="detail1" class="hidden mt-3 text-xs border-t border-slate-100 pt-3"><div id="parse1detail"></div></div>
       <div id="stepRows1" class="hidden mt-2"></div>
     </div>
-
-    <!-- Step 2 – Split -->
     <div id="card2" class="step-card bg-white border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-slate-300" onclick="toggleCard(2)">
-      <div class="flex items-center gap-2 mb-2">
-        <div id="dot2" class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">2</div>
-        <span class="text-xs font-semibold text-slate-700">Split</span>
-      </div>
-      <p class="text-xs text-slate-400">Footer codes → per-schedule PDFs</p>
-      <div id="detail2" class="hidden mt-3 text-xs space-y-1.5 border-t border-slate-100 pt-3">
-        <div id="split2detail"></div>
-      </div>
+      <div class="flex items-center gap-2 mb-2"><div id="dot2" class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">2</div><span class="text-xs font-semibold text-slate-700">Split</span></div>
+      <p class="text-xs text-slate-400">Header+footer &#8594; per-schedule PDFs</p>
+      <div id="detail2" class="hidden mt-3 text-xs border-t border-slate-100 pt-3"><div id="split2detail"></div></div>
       <div id="stepRows2" class="hidden mt-2"></div>
     </div>
-
-    <!-- Step 3 – Extract Forms -->
     <div id="card3" class="step-card bg-white border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-slate-300" onclick="toggleCard(3)">
-      <div class="flex items-center gap-2 mb-2">
-        <div id="dot3" class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">3</div>
-        <span class="text-xs font-semibold text-slate-700">Extract Forms</span>
-        <div id="cacheBadge3" class="hidden ml-auto text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium"></div>
-      </div>
-      <p class="text-xs text-slate-400">LlamaExtract · 11-field schema</p>
-      <div id="counterDisplay3" class="mt-2 text-lg font-bold text-slate-800">—</div>
-      <div id="detail3" class="hidden mt-3 border-t border-slate-100 pt-3">
-        <div id="tableRows3" class="space-y-1"></div>
-      </div>
+      <div class="flex items-center gap-2 mb-2"><div id="dot3" class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">3</div><span class="text-xs font-semibold text-slate-700">Extract Forms</span><div id="cacheBadge3" class="hidden ml-auto text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium"></div></div>
+      <p class="text-xs text-slate-400">LlamaExtract &#183; 11-field schema</p>
+      <div id="counterDisplay3" class="mt-2 text-lg font-bold text-slate-800">&#8212;</div>
+      <div id="detail3" class="hidden mt-3 border-t border-slate-100 pt-3"><div id="tableRows3" class="space-y-1"></div></div>
     </div>
-
-    <!-- Step 4 – Extract Instructions -->
     <div id="card4" class="step-card bg-white border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-slate-300" onclick="toggleCard(4)">
-      <div class="flex items-center gap-2 mb-2">
-        <div id="dot4" class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">4</div>
-        <span class="text-xs font-semibold text-slate-700">Extract Instructions</span>
-        <div id="cacheBadge4" class="hidden ml-auto text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium"></div>
-      </div>
-      <p class="text-xs text-slate-400">LlamaExtract · 10-field schema</p>
-      <div id="counterDisplay4" class="mt-2 text-lg font-bold text-slate-800">—</div>
-      <div id="detail4" class="hidden mt-3 border-t border-slate-100 pt-3">
-        <div id="tableRows4" class="space-y-1"></div>
-      </div>
+      <div class="flex items-center gap-2 mb-2"><div id="dot4" class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">4</div><span class="text-xs font-semibold text-slate-700">Extract Instructions</span><div id="cacheBadge4" class="hidden ml-auto text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium"></div></div>
+      <p class="text-xs text-slate-400">LlamaExtract &#183; 10-field schema</p>
+      <div id="counterDisplay4" class="mt-2 text-lg font-bold text-slate-800">&#8212;</div>
+      <div id="detail4" class="hidden mt-3 border-t border-slate-100 pt-3"><div id="tableRows4" class="space-y-1"></div></div>
     </div>
-
-    <!-- Step 5 – Match -->
     <div id="card5" class="step-card bg-white border border-slate-200 rounded-xl p-4 cursor-pointer hover:border-slate-300" onclick="toggleCard(5)">
-      <div class="flex items-center gap-2 mb-2">
-        <div id="dot5" class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">5</div>
-        <span class="text-xs font-semibold text-slate-700">Match</span>
-      </div>
-      <p class="text-xs text-slate-400">Normalize refs · Exact + parent fallback</p>
-      <div id="counterDisplay5" class="mt-2 text-lg font-bold text-slate-800">—</div>
-      <div id="detail5" class="hidden mt-3 border-t border-slate-100 pt-3">
-        <div id="tableRows5" class="space-y-1"></div>
-      </div>
+      <div class="flex items-center gap-2 mb-2"><div id="dot5" class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">5</div><span class="text-xs font-semibold text-slate-700">Match</span></div>
+      <p class="text-xs text-slate-400">Normalize refs &#183; Exact + parent fallback</p>
+      <div id="counterDisplay5" class="mt-2 text-lg font-bold text-slate-800">&#8212;</div>
+      <div id="detail5" class="hidden mt-3 border-t border-slate-100 pt-3"><div id="tableRows5" class="space-y-1"></div></div>
     </div>
-
   </div>
-
-  <!-- "What's happening" explainer (changes per step) -->
   <div id="explainerBox" class="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-5 text-sm text-blue-800 hidden">
-    <div class="flex gap-2 items-start">
-      <svg class="w-4 h-4 mt-0.5 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-      </svg>
-      <p id="explainerText"></p>
-    </div>
+    <div class="flex gap-2 items-start"><svg class="w-4 h-4 mt-0.5 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><p id="explainerText"></p></div>
   </div>
-
-  <!-- Live log terminal -->
   <div class="bg-slate-900 rounded-xl overflow-hidden">
     <div class="flex items-center justify-between px-4 py-2 border-b border-slate-700">
-      <div class="flex gap-1.5">
-        <div class="w-3 h-3 rounded-full bg-red-500"></div>
-        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-        <div class="w-3 h-3 rounded-full bg-green-500"></div>
-      </div>
+      <div class="flex gap-1.5"><div class="w-3 h-3 rounded-full bg-red-500"></div><div class="w-3 h-3 rounded-full bg-yellow-500"></div><div class="w-3 h-3 rounded-full bg-green-500"></div></div>
       <span class="text-slate-400 text-xs font-mono">pipeline.log</span>
       <button onclick="document.getElementById('logPanel').innerHTML=''" class="text-slate-500 hover:text-slate-300 text-xs">clear</button>
     </div>
-    <div id="logPanel" class="p-4 h-44 overflow-y-auto font-mono text-xs">
-      <span class="text-slate-500">Connecting to pipeline…</span>
-    </div>
+    <div id="logPanel" class="p-4 h-44 overflow-y-auto font-mono text-xs"><span class="text-slate-500">Connecting to pipeline&#8230;</span></div>
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════════════════
-     RESULTS SECTION
-═══════════════════════════════════════════════════════════ -->
 <section id="sectionResults" class="hidden fade-up">
-
+  <div id="jobInfoPanel" class="hidden mb-5">
+    <details class="bg-white border border-slate-200 rounded-xl shadow-sm">
+      <summary class="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer select-none hover:bg-slate-50 rounded-xl flex items-center gap-2">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Job info &amp; pipeline config
+      </summary>
+      <div class="px-4 pb-4 pt-3 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs border-t border-slate-100">
+        <div><p class="text-slate-400 mb-0.5 uppercase tracking-wide text-xs">Extract Model</p><p id="jobInfoModel" class="font-mono font-semibold text-slate-700">&#8212;</p></div>
+        <div><p class="text-slate-400 mb-0.5 uppercase tracking-wide text-xs">Extract Mode</p><p id="jobInfoMode" class="font-semibold text-slate-700">&#8212;</p></div>
+        <div><p class="text-slate-400 mb-0.5 uppercase tracking-wide text-xs">Parse Tier</p><p id="jobInfoTier" class="font-semibold text-slate-700">&#8212;</p></div>
+        <div><p class="text-slate-400 mb-0.5 uppercase tracking-wide text-xs">Pipeline Time</p><p id="jobInfoTime" class="font-semibold text-slate-700">&#8212;</p></div>
+        <div class="col-span-2"><p class="text-slate-400 mb-0.5 uppercase tracking-wide text-xs">Form PDF</p><p id="jobInfoForm" class="font-mono text-slate-700 truncate">&#8212;</p></div>
+        <div class="col-span-2"><p class="text-slate-400 mb-0.5 uppercase tracking-wide text-xs">Instruction PDF</p><p id="jobInfoInstr" class="font-mono text-slate-700 truncate">&#8212;</p></div>
+        <div><p class="text-slate-400 mb-0.5 uppercase tracking-wide text-xs">Completed</p><p id="jobInfoDate" class="text-slate-700">&#8212;</p></div>
+        <div class="col-span-3"><p class="text-slate-400 mb-0.5 uppercase tracking-wide text-xs">Job ID</p><p id="jobInfoId" class="font-mono text-slate-500 text-xs">&#8212;</p></div>
+      </div>
+    </details>
+  </div>
   <div class="flex flex-wrap items-start justify-between gap-4 mb-5">
     <div>
       <h2 class="text-2xl font-bold text-slate-900">Extraction Results</h2>
       <p id="resultsMeta" class="mt-1 text-slate-500 text-sm"></p>
     </div>
-    <div class="flex gap-2">
-      <button onclick="exportResults()"
-        class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow text-sm transition">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-        </svg>Export ZIP
+    <div class="flex flex-wrap gap-2">
+      <button onclick="copyShareLink()" title="Copy shareable link" class="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-medium rounded-lg text-sm transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>Share
+      </button>
+      <button id="btnHierarchy" onclick="toggleHierarchy()" class="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-medium rounded-lg text-sm transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16"/></svg>
+        <span id="hierarchyLabel">Hierarchy</span>
+      </button>
+      <button onclick="exportCSV()" class="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-medium rounded-lg text-sm transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0121 9.414V19a2 2 0 01-2 2z"/></svg>CSV
+      </button>
+      <button onclick="exportResults()" class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow text-sm transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>Export ZIP
       </button>
     </div>
   </div>
-
-  <!-- Summary cards -->
   <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5" id="summaryCards"></div>
-
-  <!-- Schedule tab strip -->
   <div class="flex gap-2 flex-wrap mb-4" id="scheduleTabs"></div>
-
-  <!-- Search + filter -->
-  <div class="flex flex-wrap gap-3 mb-4">
+  <div class="flex flex-wrap gap-3 mb-2">
     <div class="flex-1 min-w-48 relative">
-      <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-      </svg>
-      <input id="searchBox" type="text" placeholder="Search descriptions, MDRM codes, instruction text…"
-        class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        oninput="filterTable()"/>
+      <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <input id="searchBox" type="text" placeholder="Search descriptions, MDRM codes, instruction text&#8230;" class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" oninput="filterTable()"/>
     </div>
-    <select id="filterMatch"
-      class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-      onchange="filterTable()">
-      <option value="">All items</option>
-      <option value="matched">Matched only</option>
-      <option value="no_instruction">No instruction found</option>
-      <option value="instruction_only">Instruction only</option>
+    <select id="filterMatch" class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="filterTable()">
+      <option value="">All items</option><option value="matched">Matched only</option><option value="no_instruction">No instruction</option><option value="instruction_only">Instruction only</option>
+    </select>
+    <select id="filterType" class="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="filterTable()">
+      <option value="">All types</option><option value="dollar">Dollar</option><option value="percentage">Percentage</option><option value="count">Count</option><option value="text">Text</option><option value="yes_no">Yes/No</option><option value="date">Date</option>
     </select>
   </div>
-
-  <!-- Results table -->
+  <div id="rowCountBadge" class="text-xs text-slate-400 mb-2 min-h-4"></div>
   <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-    <div class="overflow-x-auto">
+    <div id="tableScroll" class="overflow-x-auto">
       <table class="w-full text-sm">
-        <thead class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wide">
+        <thead id="tableHead" class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase tracking-wide sticky-thead">
           <tr>
-            <th class="text-left px-4 py-3 w-24">Ref #</th>
-            <th class="text-left px-4 py-3">Description</th>
-            <th class="text-left px-4 py-3 w-32">MDRM</th>
-            <th class="text-left px-4 py-3 w-20">Type</th>
-            <th class="text-left px-4 py-3">Instruction Text <span class="font-normal text-slate-400 lowercase">(click to expand)</span></th>
-            <th class="text-left px-4 py-3 w-28">Status</th>
+            <th class="text-left px-4 py-3 w-24 sort-th" onclick="setSort('reference_number')">Ref # <span class="sort-ind" id="si-reference_number"></span></th>
+            <th class="text-left px-4 py-3 sort-th" onclick="setSort('description')">Description <span class="sort-ind" id="si-description"></span></th>
+            <th class="text-left px-4 py-3 w-36 sort-th" onclick="setSort('mdrm_code')">MDRM <span class="sort-ind" id="si-mdrm_code"></span></th>
+            <th class="text-left px-4 py-3 w-24 sort-th" onclick="setSort('data_type')">Type <span class="sort-ind" id="si-data_type"></span></th>
+            <th class="text-left px-4 py-3">Instruction <span class="font-normal text-slate-400 normal-case text-xs">(click row for detail)</span></th>
+            <th class="text-left px-4 py-3 w-16 sort-th" onclick="setSort('confidence')">Conf. <span class="sort-ind" id="si-confidence"></span></th>
+            <th class="text-left px-4 py-3 w-28 sort-th" onclick="setSort('match_status')">Status <span class="sort-ind" id="si-match_status"></span></th>
           </tr>
         </thead>
         <tbody id="resultsBody" class="divide-y divide-slate-100"></tbody>
       </table>
     </div>
     <div id="tableFooter" class="px-4 py-2 border-t border-slate-100 text-xs text-slate-400 bg-slate-50 flex justify-between">
-      <span id="footerCount"></span>
-      <span id="footerMatchRate"></span>
+      <span id="footerCount"></span><span id="footerMatchRate"></span>
     </div>
   </div>
-
 </section>
-
 </main>
-
-<!-- Toast -->
-<div id="toast" class="hidden fixed bottom-6 right-6 z-50 fade-up">
-  <div class="bg-slate-900 text-white text-sm px-5 py-3 rounded-xl shadow-xl flex items-center gap-2">
-    <span id="toastMsg"></span>
+<div id="drawerOverlay" onclick="closeDrawer()"></div>
+<aside id="rowDrawer">
+  <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-inherit z-10">
+    <h3 class="font-semibold text-slate-900 text-sm">Line Item Detail</h3>
+    <button onclick="closeDrawer()" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 text-xl leading-none transition-colors">&times;</button>
   </div>
+  <div id="drawerBody" class="p-5"></div>
+</aside>
+<div id="toast" class="hidden fixed bottom-6 right-6 z-50 fade-up">
+  <div class="bg-slate-900 text-white text-sm px-5 py-3 rounded-xl shadow-xl flex items-center gap-2"><span id="toastMsg"></span></div>
 </div>
-
 <script>
-// ─── Globals ─────────────────────────────────────────────────────────────────
-let jobId = null, allItems = [], schedIndex = [], elapsedTimer = null;
-const stepCards = {1:{},2:{},3:{},4:{},5:{}};
-
-// ─── Show/hide sections ───────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
-const show = id => $(id)?.classList.remove('hidden');
-const hide = id => $(id)?.classList.add('hidden');
-
-function showUpload(){
-  hide('sectionProgress'); hide('sectionResults');
-  show('sectionUpload'); hide('btnNewJob');
-  loadPrevJobs();
-  loadDefaultProjectPdfs();
-}
-
-// ─── Toast ────────────────────────────────────────────────────────────────────
-function toast(msg, ms=3500){
-  $('toastMsg').textContent=msg; show('toast');
-  setTimeout(()=>hide('toast'),ms);
-}
-
-// ─── File drop helpers ────────────────────────────────────────────────────────
+let jobId=null,allItems=[],schedIndex=[],elapsedTimer=null;
+let sortKey=null,sortDir=1,hierarchyMode=false;
+let etaTotal=0,etaDone=0,etaStepStart=null;
+let _renderedRows=[];
+(function(){if(localStorage.getItem('darkMode')==='1'){document.documentElement.classList.add('dark');document.getElementById('darkIcon').innerHTML='&#9728;&#65039;';}})();
+function toggleDarkMode(){const on=document.documentElement.classList.toggle('dark');localStorage.setItem('darkMode',on?'1':'0');document.getElementById('darkIcon').innerHTML=on?'&#9728;&#65039;':'&#127769;';}
+const $=id=>document.getElementById(id);
+const show=id=>$(id)?.classList.remove('hidden');
+const hide=id=>$(id)?.classList.add('hidden');
+const esc=s=>s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):'';
+function showUpload(){hide('sectionProgress');hide('sectionResults');show('sectionUpload');hide('btnNewJob');loadPrevJobs();loadDefaultProjectPdfs();}
+function toast(msg,ms=3500){$('toastMsg').textContent=msg;show('toast');setTimeout(()=>hide('toast'),ms);}
 function ev(e,id){e.preventDefault();$(id).classList.add('drop-active')}
 function el(id){$(id).classList.remove('drop-active')}
-function ed(e,inp,drop,lbl,ic){
-  e.preventDefault(); el(drop);
-  const f=e.dataTransfer.files[0];
-  if(!f||!f.name.toLowerCase().endsWith('.pdf')){toast('Please drop a PDF file.');return;}
-  const dt=new DataTransfer(); dt.items.add(f);
-  $(inp).files=dt.files;
-  onSel(inp,drop,lbl,ic);
-}
-function onSel(inp,drop,lbl,ic){
-  const f=$(inp).files[0]; if(!f)return;
-  $(ic).classList.add('hidden');
-  $(lbl).classList.remove('hidden');
-  $(lbl).textContent=`✓ ${f.name} (${(f.size/1048576).toFixed(1)} MB)`;
-  $(drop).classList.add('border-blue-400','bg-blue-50');
-  $('btnStart').disabled=!($('inputForm').files[0]&&$('inputInstr').files[0]);
-}
-
-// ─── Previous jobs ────────────────────────────────────────────────────────────
-async function loadPrevJobs(){
-  try{
-    const jobs=await(await fetch('/api/jobs')).json();
-    const panel=$('prevJobsPanel'), list=$('prevJobsList');
-    if(!jobs.length){panel.classList.add('hidden');return;}
-    panel.classList.remove('hidden');
-    list.innerHTML=jobs.slice(0,5).map(j=>`
-      <div class="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0 text-xs">
-        <div class="flex items-center gap-2 min-w-0">
-          <span class="font-mono text-slate-500 shrink-0">${j.job_id.slice(0,8)}</span>
-          <span class="text-slate-600 truncate">${j.form_pdf||'—'}</span>
-          <span class="bg-green-100 text-green-700 px-1.5 py-0.5 rounded shrink-0">${j.schedules} schedules</span>
-          <span class="text-slate-400 shrink-0">${j.completed_at?new Date(j.completed_at).toLocaleDateString():''}</span>
-        </div>
-        <button onclick="loadJobResults('${j.job_id}')" class="text-blue-600 hover:underline shrink-0 ml-3 font-medium">View</button>
-      </div>`).join('');
-  }catch(_){}
-}
-
-// ─── Start extraction ─────────────────────────────────────────────────────────
-function beginPipelineJob(newJobId){
-  jobId=newJobId;
-  hide('sectionUpload'); show('sectionProgress'); show('btnNewJob');
-  resetProgress();
-  startElapsedTimer();
-  connectSSE(jobId);
-}
-
-async function startExtraction(){
-  const fForm=$('inputForm').files[0], fInstr=$('inputInstr').files[0];
-  const errEl=$('uploadErr'); errEl.classList.add('hidden');
-  const fd=new FormData(); fd.append('form_pdf',fForm); fd.append('instr_pdf',fInstr);
-  $('btnStart').disabled=true;
-  let res;
-  try{ res=await fetch('/api/upload',{method:'POST',body:fd}); }
-  catch(e){ errEl.textContent='Network error: '+e.message; errEl.classList.remove('hidden'); $('btnStart').disabled=false; return; }
-  if(!res.ok){
-    const b=await res.json().catch(()=>({detail:res.statusText}));
-    errEl.textContent=b.detail||'Upload failed.'; errEl.classList.remove('hidden'); $('btnStart').disabled=false; return;
-  }
-  const data=await res.json();
-  beginPipelineJob(data.job_id);
-  $('btnStart').disabled=false;
-}
-
-async function startWithProjectPdfs(){
-  const errEl=$('uploadErr'); errEl.classList.add('hidden');
-  const btn=$('btnProjectPdfs'); if(btn) btn.disabled=true;
-  $('btnStart').disabled=true;
-  let res;
-  try{ res=await fetch('/api/start-default',{method:'POST'}); }
-  catch(e){ errEl.textContent='Network error: '+e.message; errEl.classList.remove('hidden'); if(btn) btn.disabled=false; $('btnStart').disabled=false; return; }
-  if(!res.ok){
-    const b=await res.json().catch(()=>({detail:res.statusText}));
-    errEl.textContent=(typeof b.detail==='string'?b.detail:JSON.stringify(b.detail))||'Could not start.'; errEl.classList.remove('hidden');
-    if(btn) btn.disabled=false; $('btnStart').disabled=false; return;
-  }
-  const data=await res.json();
-  beginPipelineJob(data.job_id);
-  if(btn) btn.disabled=false;
-  $('btnStart').disabled=false;
-}
-
-async function loadDefaultProjectPdfs(){
-  try{
-    const r=await fetch('/api/default-files');
-    const j=await r.json();
-    if(j.available){
-      show('defaultFilesPanel');
-      const mb=n=>(n/1048576).toFixed(1)+' MB';
-      $('defaultFilesDetail').textContent=`${j.form} (${mb(j.form_bytes)})  +  ${j.instr} (${mb(j.instr_bytes)})`;
-    }
-  }catch(_){}
-}
-
-// ─── Elapsed timer ────────────────────────────────────────────────────────────
+function ed(e,inp,drop,lbl,ic){e.preventDefault();el(drop);const f=e.dataTransfer.files[0];if(!f||!f.name.toLowerCase().endsWith('.pdf')){toast('Please drop a PDF file.');return;}const dt=new DataTransfer();dt.items.add(f);$(inp).files=dt.files;onSel(inp,drop,lbl,ic);}
+function onSel(inp,drop,lbl,ic){const f=$(inp).files[0];if(!f)return;$(ic).classList.add('hidden');$(lbl).classList.remove('hidden');$(lbl).textContent=`\u2713 ${f.name} (${(f.size/1048576).toFixed(1)} MB)`;$(drop).classList.add('border-blue-400','bg-blue-50');$('btnStart').disabled=!($('inputForm').files[0]&&$('inputInstr').files[0]);}
+async function loadPrevJobs(){try{const jobs=await(await fetch('/api/jobs')).json();const panel=$('prevJobsPanel'),list=$('prevJobsList');if(!jobs.length){panel.classList.add('hidden');return;}panel.classList.remove('hidden');list.innerHTML=jobs.slice(0,5).map(j=>`<div class="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0 text-xs"><div class="flex items-center gap-2 min-w-0"><span class="font-mono text-slate-500 shrink-0">${j.job_id.slice(0,8)}</span><span class="text-slate-600 truncate">${j.form_pdf||'\u2014'}</span><span class="bg-green-100 text-green-700 px-1.5 py-0.5 rounded shrink-0">${j.schedules} schedules</span><span class="text-slate-400 shrink-0">${j.completed_at?new Date(j.completed_at).toLocaleDateString():''}</span></div><button onclick="loadJobResults('${j.job_id}')" class="text-blue-600 hover:underline shrink-0 ml-3 font-medium">View</button></div>`).join('');}catch(_){}}
+function beginPipelineJob(id){jobId=id;hide('sectionUpload');show('sectionProgress');show('btnNewJob');resetProgress();startElapsedTimer();connectSSE(id);}
+async function startExtraction(){const fForm=$('inputForm').files[0],fInstr=$('inputInstr').files[0];const errEl=$('uploadErr');errEl.classList.add('hidden');const fd=new FormData();fd.append('form_pdf',fForm);fd.append('instr_pdf',fInstr);$('btnStart').disabled=true;let res;try{res=await fetch('/api/upload',{method:'POST',body:fd});}catch(e){errEl.textContent='Network error: '+e.message;errEl.classList.remove('hidden');$('btnStart').disabled=false;return;}if(!res.ok){const b=await res.json().catch(()=>({detail:res.statusText}));errEl.textContent=b.detail||'Upload failed.';errEl.classList.remove('hidden');$('btnStart').disabled=false;return;}const data=await res.json();beginPipelineJob(data.job_id);$('btnStart').disabled=false;}
+async function startWithProjectPdfs(){const errEl=$('uploadErr');errEl.classList.add('hidden');const btn=$('btnProjectPdfs');if(btn)btn.disabled=true;$('btnStart').disabled=true;let res;try{res=await fetch('/api/start-default',{method:'POST'});}catch(e){errEl.textContent='Network error: '+e.message;errEl.classList.remove('hidden');if(btn)btn.disabled=false;$('btnStart').disabled=false;return;}if(!res.ok){const b=await res.json().catch(()=>({detail:res.statusText}));errEl.textContent=(typeof b.detail==='string'?b.detail:JSON.stringify(b.detail))||'Could not start.';errEl.classList.remove('hidden');if(btn)btn.disabled=false;$('btnStart').disabled=false;return;}const data=await res.json();beginPipelineJob(data.job_id);if(btn)btn.disabled=false;$('btnStart').disabled=false;}
+async function loadDefaultProjectPdfs(){try{const r=await fetch('/api/default-files');const j=await r.json();if(j.available){show('defaultFilesPanel');const mb=n=>(n/1048576).toFixed(1)+' MB';$('defaultFilesDetail').textContent=`${j.form} (${mb(j.form_bytes)})  +  ${j.instr} (${mb(j.instr_bytes)})`;}}catch(_){}}
 let elapsedStart=null;
-function startElapsedTimer(){
-  elapsedStart=Date.now();
-  if(elapsedTimer) clearInterval(elapsedTimer);
-  elapsedTimer=setInterval(()=>{
-    const s=Math.floor((Date.now()-elapsedStart)/1000);
-    $('elapsedDisplay').textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
-  },1000);
-}
-function stopElapsedTimer(){ if(elapsedTimer) clearInterval(elapsedTimer); }
-
-// ─── Reset progress UI ────────────────────────────────────────────────────────
-function resetProgress(){
-  $('progressBar').style.width='0%'; $('pctLabel').textContent='0%';
-  $('progressSubtitle').textContent='Starting pipeline…';
-  $('logPanel').innerHTML='<span class="text-slate-500">Connecting…</span>';
-  hide('explainerBox');
-  for(let i=1;i<=5;i++){
-    setDot(i,'idle'); hide(`detail${i}`); hide(`stepRows${i}`);
-    const cd=$(`counterDisplay${i}`); if(cd) cd.textContent='—';
-    const cb=$(`cacheBadge${i}`); if(cb) cb.classList.add('hidden');
-    $(`card${i}`).classList.remove('active','border-blue-300');
-  }
-}
-
-// ─── Step dot states ──────────────────────────────────────────────────────────
-function setDot(n,state){
-  const d=$(`dot${n}`);
-  const base='w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ';
-  const icons={
-    idle:   base+'bg-slate-100 text-slate-400',
-    run:    base+'bg-blue-500 text-white pulse-ring',
-    done:   base+'bg-green-500 text-white',
-    cached: base+'bg-amber-400 text-white',
-    error:  base+'bg-red-500 text-white',
-  };
-  d.className=icons[state]||icons.idle;
-  if(state==='run') d.innerHTML=`<svg class="w-3.5 h-3.5 spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>`;
-  else if(state==='done') d.innerHTML=`<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>`;
-  else if(state==='cached') d.innerHTML=`<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>`;
-  else if(state==='error') d.innerHTML='!';
-  else d.textContent=n;
-}
-
-// ─── Step card expand/collapse ────────────────────────────────────────────────
-function toggleCard(n){
-  const d=$(`detail${n}`); if(d) d.classList.toggle('hidden');
-}
-
-// ─── Log ──────────────────────────────────────────────────────────────────────
-function log(msg,cls='text-slate-400'){
-  const p=$('logPanel');
-  if(p.querySelector('.text-slate-500')) p.innerHTML='';
-  const span=document.createElement('div');
-  span.className=`${cls} leading-relaxed`;
-  span.textContent=`${new Date().toLocaleTimeString()} › ${msg}`;
-  p.appendChild(span);
-  p.scrollTop=p.scrollHeight;
-}
-
-// ─── SSE handler ──────────────────────────────────────────────────────────────
-function connectSSE(id){
-  const src=new EventSource(`/api/jobs/${id}/stream`);
-  src.onmessage=e=>{
-    const evt=JSON.parse(e.data);
-    handleEvent(evt);
-    if((evt.step===5&&evt.status==='done')||evt.status==='error'){
-      src.close();
-      if(evt.step===5) setTimeout(()=>loadJobResults(id),900);
-      else toast('Pipeline error — see log.',6000);
-    }
-  };
-  src.onerror=()=>{ src.close(); log('SSE dropped — polling…','text-yellow-400'); pollStatus(id); };
-}
-
-function handleEvent(evt){
-  const {step,step_name,schedule,status,message,pct,detail}=evt;
-
-  // Progress bar
-  $('progressBar').style.width=pct+'%';
-  $('pctLabel').textContent=Math.round(pct)+'%';
-  $('progressSubtitle').textContent=step_name+(schedule?` · ${schedule.replace('Schedule_','')}`:'');
-
-  // Log
-  const cls = status==='done'?'text-green-400':status==='cached'?'text-amber-400':status==='error'?'text-red-400':'text-blue-400';
-  log(message,cls);
-
-  // Mark prior steps done
-  for(let i=1;i<step;i++) setDot(i,'done');
-
-  // Current step dot
-  if(status==='done'&&!schedule) setDot(step,'done');
-  else if(status==='cached'&&!schedule) setDot(step,'cached');
-  else if(status==='error') setDot(step,'error');
-  else setDot(step,'run');
-
-  // Highlight active card
-  for(let i=1;i<=5;i++) $(`card${i}`).classList.remove('active','border-blue-300','border-green-300');
-  $(`card${step}`)?.classList.add('active','border-blue-300');
-
-  // Explainer
-  if(detail?.what){
-    show('explainerBox');
-    $('explainerText').textContent=detail.what;
-  }
-
-  // Step-specific UI updates
-  if(step===1) updateStep1(status,detail);
-  if(step===2) updateStep2(status,detail);
-  if(step===3) updateStep3(status,schedule,detail);
-  if(step===4) updateStep4(status,schedule,detail);
-  if(step===5) updateStep5(status,schedule,detail);
-
-  if(step===5&&status==='done') stopElapsedTimer();
-}
-
-// ─── Step 1: Parse detail ─────────────────────────────────────────────────────
-function updateStep1(status,d){
-  if(!d||!d.form) return;
-  const pf=d.form, pi=d.instructions;
-  if(!pf) return;
-  const rows=[
-    {label:'Form PDF',name:pf.file,pages:pf.pages,mb:pf.size_mb,t:pf.elapsed_s,cached:pf.from_cache},
-    pi?{label:'Instruction PDF',name:pi.file,pages:pi.pages,mb:pi.size_mb,t:pi.elapsed_s,cached:pi.from_cache}:null,
-  ].filter(Boolean);
-
-  // Cache badges
-  const allCached=rows.every(r=>r.cached);
-  const someCached=rows.some(r=>r.cached);
-  const cb=$('cacheBadge1');
-  if(someCached){ cb.classList.remove('hidden'); cb.textContent=allCached?'all cached':'partial cache'; }
-
-  show('detail1');
-  $('parse1detail').innerHTML=rows.map(r=>`
-    <div class="flex justify-between items-center py-1 border-b border-slate-50 last:border-0">
-      <span class="text-slate-500">${r.label}</span>
-      <div class="text-right">
-        <span class="text-slate-700 font-medium">${r.pages||'…'} pages</span>
-        <span class="text-slate-400 ml-1">${r.mb} MB</span>
-        ${r.cached?'<span class="ml-1 bg-amber-100 text-amber-700 px-1 rounded">cached</span>':''}
-        ${r.t?`<span class="text-slate-400 ml-1">${r.t}s</span>`:''}
-      </div>
-    </div>`).join('');
-}
-
-// ─── Step 2: Split detail ─────────────────────────────────────────────────────
-function updateStep2(status,d){
-  if(!d||!d.form_schedules) return;
-  show('detail2');
-  const fs=d.form_schedules||[], is_=d.instr_schedules||[];
-  $('split2detail').innerHTML=`
-    <div class="grid grid-cols-2 gap-2">
-      <div>
-        <p class="font-semibold text-slate-600 mb-1">Form (${fs.length})</p>
-        ${fs.map(s=>`<div class="flex justify-between"><span>${s.label.replace('Schedule_','')}</span><span class="text-slate-400">${s.pages}pp</span></div>`).join('')}
-      </div>
-      <div>
-        <p class="font-semibold text-slate-600 mb-1">Instructions (${is_.length})</p>
-        ${is_.map(s=>`<div class="flex justify-between"><span>${s.label.replace('Schedule_','')}</span><span class="text-slate-400">${s.pages}pp</span></div>`).join('')}
-      </div>
-    </div>`;
-}
-
-// ─── Step 3/4: Extraction row ─────────────────────────────────────────────────
-function updateExtractionStep(stepN,status,schedule,detail){
-  const counterEl=$(`counterDisplay${stepN}`);
-  const tableEl=$(`tableRows${stepN}`);
-  const badgeEl=$(`cacheBadge${stepN}`);
-
-  if(detail?.running_total!=null){
-    counterEl.textContent=detail.running_total.toLocaleString()+' items';
-  }
-  if(detail?.total_items!=null){
-    counterEl.textContent=detail.total_items.toLocaleString()+' items total';
-    if(detail.cache_hits){
-      badgeEl.classList.remove('hidden');
-      badgeEl.textContent=`${detail.cache_hits} cached`;
-    }
-  }
-
-  if(detail?.row&&schedule){
-    const row=detail.row;
-    show(`detail${stepN}`); show(`tableRows${stepN}`);
-    const existing=tableEl.querySelector(`[data-sched="${row.schedule}"]`);
-    const html=`<div data-sched="${row.schedule}" class="flex items-center justify-between text-xs py-0.5">
-      <span class="font-mono text-slate-600">${row.schedule}</span>
-      <div class="flex items-center gap-2">
-        <span class="text-slate-500">${row.items} items</span>
-        ${row.from_cache?'<span class="bg-amber-100 text-amber-700 px-1 rounded">cached</span>':''}
-        <span class="text-slate-400">${row.elapsed_s}s</span>
-        <span class="text-green-500">✓</span>
-      </div>
-    </div>`;
-    if(existing) existing.outerHTML=html;
-    else tableEl.insertAdjacentHTML('beforeend',html);
-  }
-}
-
-function updateStep3(status,schedule,d){ updateExtractionStep(3,status,schedule,d); }
-function updateStep4(status,schedule,d){ updateExtractionStep(4,status,schedule,d); }
-
-// ─── Step 5: Match rows ───────────────────────────────────────────────────────
-function updateStep5(status,schedule,d){
-  const counterEl=$('counterDisplay5');
-  const tableEl=$('tableRows5');
-
-  if(d?.row&&schedule){
-    const r=d.row;
-    const matchPct=r.match_rate_pct||0;
-    const barColor=matchPct>=80?'bg-green-400':matchPct>=50?'bg-yellow-400':'bg-red-400';
-    show('detail5'); show('tableRows5');
-    const html=`<div class="text-xs py-0.5">
-      <div class="flex justify-between mb-0.5">
-        <span class="font-mono text-slate-600">${r.schedule}</span>
-        <span class="font-semibold text-slate-700">${matchPct}%</span>
-      </div>
-      <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <div class="${barColor} h-full rounded-full" style="width:${matchPct}%"></div>
-      </div>
-    </div>`;
-    tableEl.insertAdjacentHTML('beforeend',html);
-  }
-
-  if(d?.total_items!=null){
-    counterEl.textContent=`${d.total_matched}/${d.total_items} matched (${d.overall_match_rate_pct}%)`;
-    const tb=$('cacheTag');
-    if(d.pipeline_elapsed_s){
-      tb.classList.remove('hidden');
-      tb.textContent=`Total: ${Math.floor(d.pipeline_elapsed_s/60)}m ${Math.round(d.pipeline_elapsed_s%60)}s`;
-    }
-  }
-}
-
-// ─── Poll fallback ────────────────────────────────────────────────────────────
-async function pollStatus(id){
-  try{
-    const evts=await(await fetch(`/api/jobs/${id}/status`)).json();
-    if(!evts.length){setTimeout(()=>pollStatus(id),3000);return;}
-    evts.forEach(handleEvent);
-    const last=evts[evts.length-1];
-    if(last.step===5&&last.status==='done') loadJobResults(id);
-    else if(last.status==='error') toast('Pipeline error.',5000);
-    else setTimeout(()=>pollStatus(id),3000);
-  }catch(_){setTimeout(()=>pollStatus(id),5000);}
-}
-
-// ─── Load + display results ───────────────────────────────────────────────────
-async function loadJobResults(id){
-  jobId=id;
-  let idx;
-  try{
-    const r=await fetch(`/api/jobs/${id}/results`);
-    if(!r.ok){toast('Results not ready yet.');return;}
-    idx=await r.json();
-  }catch(_){toast('Failed to load results.');return;}
-
-  schedIndex=idx.schedules||[];
-  hide('sectionUpload'); hide('sectionProgress');
-  show('sectionResults'); show('btnNewJob');
-
-  const totalItems=idx.total_line_items||(schedIndex.reduce((s,x)=>s+x.total_line_items,0));
-  const totalMatched=idx.total_matched||(schedIndex.reduce((s,x)=>s+x.matched,0));
-  const matchPct=idx.overall_match_rate_pct||(totalItems?Math.round(totalMatched/totalItems*100):0);
-
-  $('resultsMeta').textContent=
-    `${schedIndex.length} schedules · ${totalItems.toLocaleString()} line items · ${totalMatched.toLocaleString()} matched (${matchPct}%)`;
-
-  // Summary cards
-  $('summaryCards').innerHTML=[
-    {l:'Schedules',v:schedIndex.length,c:'blue'},
-    {l:'Total Items',v:totalItems.toLocaleString(),c:'indigo'},
-    {l:'Matched',v:totalMatched.toLocaleString(),c:'green'},
-    {l:'Unmatched',v:(totalItems-totalMatched).toLocaleString(),c:'amber'},
-    {l:'Match Rate',v:matchPct+'%',c:matchPct>=80?'green':matchPct>=50?'amber':'red'},
-  ].map(c=>`<div class="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
-    <p class="text-xs font-medium text-slate-500 uppercase tracking-wide">${c.l}</p>
-    <p class="text-xl font-bold text-slate-900 mt-1">${c.v}</p>
-  </div>`).join('');
-
-  // Tabs
-  $('scheduleTabs').innerHTML=schedIndex.map((s,i)=>`
-    <button onclick="selSchedule('${s.label}',this)" data-label="${s.label}"
-      class="sched-tab px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 text-slate-600 hover:bg-blue-50 hover:border-blue-300 transition-all ${i===0?'tab-active':''}">
-      ${s.schedule}
-      <span class="ml-1 opacity-60">${s.match_rate_pct!=null?s.match_rate_pct+'%':''}</span>
-    </button>`).join('');
-
-  if(schedIndex.length) selSchedule(schedIndex[0].label, $('scheduleTabs').querySelector('[data-label]'));
-}
-
-async function selSchedule(label,tabEl){
-  document.querySelectorAll('.sched-tab').forEach(t=>t.classList.remove('tab-active'));
-  tabEl?.classList.add('tab-active');
-  try{
-    const r=await fetch(`/api/jobs/${jobId}/results/${label}`);
-    if(!r.ok){toast('Could not load schedule.');return;}
-    const data=await r.json();
-    allItems=[...(data.line_items||[]),...(data.instruction_only||[]).map(x=>({...x,_io:true}))];
-    filterTable();
-  }catch(_){toast('Error loading schedule.');}
-}
-
-function filterTable(){
-  const q=$('searchBox').value.toLowerCase();
-  const f=$('filterMatch').value;
-  const rows=allItems.filter(item=>{
-    if(f==='matched'&&!item.match_status?.startsWith('matched')) return false;
-    if(f==='no_instruction'&&item.match_status!=='no_instruction_found') return false;
-    if(f==='instruction_only'&&item.match_status!=='instruction_only_no_form_item') return false;
-    if(!q) return true;
-    return [item.reference_number,item.description,item.mdrm_code,item.mdrm_prefix,item.instruction_title,item.instruction_text]
-      .filter(Boolean).join(' ').toLowerCase().includes(q);
-  });
-  renderTable(rows);
-}
-
-function renderTable(rows){
-  const badge=s=>{
-    if(!s) return '';
-    if(s.startsWith('matched')) return '<span class="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs">Matched</span>';
-    if(s==='no_instruction_found') return '<span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs">No Instruction</span>';
-    if(s==='instruction_only_no_form_item') return '<span class="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs">Instr Only</span>';
-    return `<span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">${s}</span>`;
-  };
-  const mdrm=item=>{
-    if(!item.mdrm_code&&!item.mdrm_prefix) return '<span class="text-slate-300">—</span>';
-    return `<span class="font-mono text-xs bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded">${item.mdrm_prefix||'BHCK'}&nbsp;${item.mdrm_code||''}</span>`;
-  };
-  const esc=s=>s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):'';
-
-  $('resultsBody').innerHTML=rows.length
-    ? rows.map(item=>`<tr class="hover:bg-slate-50 transition-colors">
-        <td class="px-4 py-3 align-top font-mono text-xs font-semibold text-slate-700 whitespace-nowrap">${esc(item.reference_number||'—')}</td>
-        <td class="px-4 py-3 align-top text-xs text-slate-700 max-w-xs">${esc(item.description||item.instruction_title||'—')}</td>
-        <td class="px-4 py-3 align-top">${mdrm(item)}</td>
-        <td class="px-4 py-3 align-top text-xs text-slate-500">${esc(item.data_type||'—')}</td>
-        <td class="px-4 py-3 align-top text-xs text-slate-600 max-w-sm">
-          ${item.instruction_text
-            ?`<span class="instr-clamp" onclick="this.classList.toggle('open')">${esc(item.instruction_text)}</span>`
-            :'<span class="text-slate-300">—</span>'}
-        </td>
-        <td class="px-4 py-3 align-top">${badge(item.match_status)}</td>
-      </tr>`).join('')
-    : `<tr><td colspan="6" class="px-4 py-10 text-center text-slate-400 text-sm">No items match.</td></tr>`;
-
-  const matched=rows.filter(r=>r.match_status?.startsWith('matched')).length;
-  const rate=rows.length?Math.round(matched/rows.filter(r=>!r._io).length*100||0):0;
-  $('footerCount').textContent=`${rows.length.toLocaleString()} of ${allItems.length.toLocaleString()} items`;
-  $('footerMatchRate').textContent=rows.length?`Match rate: ${rate}%`:'';
-}
-
-function exportResults(){
-  if(jobId) window.location.href=`/api/jobs/${jobId}/export`;
-}
-
-// ─── Init ─────────────────────────────────────────────────────────────────────
+function startElapsedTimer(){elapsedStart=Date.now();if(elapsedTimer)clearInterval(elapsedTimer);elapsedTimer=setInterval(()=>{const s=Math.floor((Date.now()-elapsedStart)/1000);$('elapsedDisplay').textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;},1000);}
+function stopElapsedTimer(){if(elapsedTimer)clearInterval(elapsedTimer);}
+function updateETA(){if(!etaTotal||!etaDone||!etaStepStart){hide('etaDisplay');return;}const elapsed=(Date.now()-etaStepStart)/1000;const remaining=Math.max(0,Math.round((elapsed/etaDone)*(etaTotal-etaDone)));const m=Math.floor(remaining/60),s=remaining%60;$('etaDisplay').textContent=remaining<5?'almost done\u2026':`~${m>0?m+'m ':''}${s}s left`;show('etaDisplay');}
+function resetProgress(){$('progressBar').style.width='0%';$('pctLabel').textContent='0%';$('progressSubtitle').textContent='Starting pipeline\u2026';$('logPanel').innerHTML='<span class="text-slate-500">Connecting\u2026</span>';hide('explainerBox');hide('etaDisplay');etaTotal=0;etaDone=0;etaStepStart=null;for(let i=1;i<=5;i++){setDot(i,'idle');hide(`detail${i}`);hide(`stepRows${i}`);const cd=$(`counterDisplay${i}`);if(cd)cd.textContent='\u2014';const cb=$(`cacheBadge${i}`);if(cb)cb.classList.add('hidden');$(`card${i}`).classList.remove('active','border-blue-300');}}
+function setDot(n,state){const d=$(`dot${n}`);const base='w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ';const icons={idle:base+'bg-slate-100 text-slate-400',run:base+'bg-blue-500 text-white pulse-ring',done:base+'bg-green-500 text-white',cached:base+'bg-amber-400 text-white',error:base+'bg-red-500 text-white'};d.className=icons[state]||icons.idle;if(state==='run')d.innerHTML='<svg class="w-3.5 h-3.5 spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>';else if(state==='done')d.innerHTML='<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>';else if(state==='cached')d.innerHTML='<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>';else if(state==='error')d.innerHTML='!';else d.textContent=n;}
+function toggleCard(n){const d=$(`detail${n}`);if(d)d.classList.toggle('hidden');}
+function log(msg,cls='text-slate-400'){const p=$('logPanel');if(p.querySelector('.text-slate-500'))p.innerHTML='';const span=document.createElement('div');span.className=`${cls} leading-relaxed`;span.textContent=`${new Date().toLocaleTimeString()} \u203a ${msg}`;p.appendChild(span);p.scrollTop=p.scrollHeight;}
+function connectSSE(id){const src=new EventSource(`/api/jobs/${id}/stream`);src.onmessage=e=>{const evt=JSON.parse(e.data);handleEvent(evt);if((evt.step===5&&evt.status==='done')||evt.status==='error'){src.close();if(evt.step===5)setTimeout(()=>loadJobResults(id),900);else toast('Pipeline error \u2014 see log.',6000);}};src.onerror=()=>{src.close();log('SSE dropped \u2014 polling\u2026','text-yellow-400');pollStatus(id);};}
+function handleEvent(evt){const{step,step_name,schedule,status,message,pct,detail}=evt;$('progressBar').style.width=pct+'%';$('pctLabel').textContent=Math.round(pct)+'%';$('progressSubtitle').textContent=step_name+(schedule?` \u00b7 ${schedule.replace('Schedule_','')}` :'');const cls=status==='done'?'text-green-400':status==='cached'?'text-amber-400':status==='error'?'text-red-400':'text-blue-400';log(message,cls);for(let i=1;i<step;i++)setDot(i,'done');if(status==='done'&&!schedule)setDot(step,'done');else if(status==='cached'&&!schedule)setDot(step,'cached');else if(status==='error')setDot(step,'error');else setDot(step,'run');for(let i=1;i<=5;i++)$(`card${i}`).classList.remove('active','border-blue-300','border-green-300');$(`card${step}`)?.classList.add('active','border-blue-300');if(detail?.what){show('explainerBox');$('explainerText').textContent=detail.what;}if(step===1)updateStep1(status,detail);if(step===2)updateStep2(status,detail);if(step===3)updateStep3(status,schedule,detail);if(step===4)updateStep4(status,schedule,detail);if(step===5)updateStep5(status,schedule,detail);if(step===5&&status==='done'){stopElapsedTimer();hide('etaDisplay');}}
+function updateStep1(status,d){if(!d||!d.form)return;const pf=d.form,pi=d.instructions;if(!pf)return;const rows=[{label:'Form PDF',pages:pf.pages,mb:pf.size_mb,t:pf.elapsed_s,cached:pf.from_cache},pi?{label:'Instruction PDF',pages:pi.pages,mb:pi.size_mb,t:pi.elapsed_s,cached:pi.from_cache}:null].filter(Boolean);const someCached=rows.some(r=>r.cached),allCached=rows.every(r=>r.cached);const cb=$('cacheBadge1');if(someCached){cb.classList.remove('hidden');cb.textContent=allCached?'all cached':'partial cache';}show('detail1');$('parse1detail').innerHTML=rows.map(r=>`<div class="flex justify-between items-center py-1 border-b border-slate-50 last:border-0"><span class="text-slate-500">${r.label}</span><div class="text-right"><span class="text-slate-700 font-medium">${r.pages||'\u2026'} pages</span><span class="text-slate-400 ml-1">${r.mb} MB</span>${r.cached?'<span class="ml-1 bg-amber-100 text-amber-700 px-1 rounded">cached</span>':''}${r.t?`<span class="text-slate-400 ml-1">${r.t}s</span>`:''}</div></div>`).join('');}
+function updateStep2(status,d){if(!d||!d.form_schedules)return;show('detail2');const fs=d.form_schedules||[],is_=d.instr_schedules||[];$('split2detail').innerHTML=`<div class="grid grid-cols-2 gap-2"><div><p class="font-semibold text-slate-600 mb-1">Form (${fs.length})</p>${fs.map(s=>`<div class="flex justify-between"><span>${s.label.replace('Schedule_','')}</span><span class="text-slate-400">${s.pages}pp</span></div>`).join('')}</div><div><p class="font-semibold text-slate-600 mb-1">Instructions (${is_.length})</p>${is_.map(s=>`<div class="flex justify-between"><span>${s.label.replace('Schedule_','')}</span><span class="text-slate-400">${s.pages}pp</span></div>`).join('')}</div></div>`;}
+function updateExtractionStep(stepN,status,schedule,detail){const counterEl=$(`counterDisplay${stepN}`),tableEl=$(`tableRows${stepN}`),badgeEl=$(`cacheBadge${stepN}`);if(detail?.batch_size&&stepN===3&&!etaStepStart){etaTotal=detail.batch_size;etaDone=0;etaStepStart=Date.now();}if(detail?.running_total!=null)counterEl.textContent=detail.running_total.toLocaleString()+' items';if(detail?.total_items!=null){counterEl.textContent=detail.total_items.toLocaleString()+' items total';if(detail.cache_hits){badgeEl.classList.remove('hidden');badgeEl.textContent=`${detail.cache_hits} cached`;}hide('etaDisplay');}if(detail?.row&&schedule){if(stepN===3){etaDone++;updateETA();}const row=detail.row;show(`detail${stepN}`);show(`tableRows${stepN}`);const existing=tableEl.querySelector(`[data-sched="${row.schedule}"]`);const html=`<div data-sched="${row.schedule}" class="flex items-center justify-between text-xs py-0.5"><span class="font-mono text-slate-600">${row.schedule}</span><div class="flex items-center gap-2"><span class="text-slate-500">${row.items} items</span>${row.from_cache?'<span class="bg-amber-100 text-amber-700 px-1 rounded">cached</span>':''}<span class="text-slate-400">${row.elapsed_s}s</span><span class="text-green-500">\u2713</span></div></div>`;if(existing)existing.outerHTML=html;else tableEl.insertAdjacentHTML('beforeend',html);}}
+function updateStep3(status,schedule,d){updateExtractionStep(3,status,schedule,d);}
+function updateStep4(status,schedule,d){updateExtractionStep(4,status,schedule,d);}
+function updateStep5(status,schedule,d){const counterEl=$('counterDisplay5'),tableEl=$('tableRows5');if(d?.row&&schedule){const r=d.row,matchPct=r.match_rate_pct||0;const barColor=matchPct>=80?'bg-green-400':matchPct>=50?'bg-yellow-400':'bg-red-400';show('detail5');show('tableRows5');tableEl.insertAdjacentHTML('beforeend',`<div class="text-xs py-0.5"><div class="flex justify-between mb-0.5"><span class="font-mono text-slate-600">${r.schedule}</span><span class="font-semibold text-slate-700">${matchPct}%</span></div><div class="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div class="${barColor} h-full rounded-full" style="width:${matchPct}%"></div></div></div>`);}if(d?.total_items!=null){counterEl.textContent=`${d.total_matched}/${d.total_items} matched (${d.overall_match_rate_pct}%)`;const tb=$('cacheTag');if(d.pipeline_elapsed_s){tb.classList.remove('hidden');tb.textContent=`Total: ${Math.floor(d.pipeline_elapsed_s/60)}m ${Math.round(d.pipeline_elapsed_s%60)}s`;}}}
+async function pollStatus(id){try{const evts=await(await fetch(`/api/jobs/${id}/status`)).json();if(!evts.length){setTimeout(()=>pollStatus(id),3000);return;}evts.forEach(handleEvent);const last=evts[evts.length-1];if(last.step===5&&last.status==='done')loadJobResults(id);else if(last.status==='error')toast('Pipeline error.',5000);else setTimeout(()=>pollStatus(id),3000);}catch(_){setTimeout(()=>pollStatus(id),5000);}}
+async function loadJobResults(id){jobId=id;let idx;try{const r=await fetch(`/api/jobs/${id}/results`);if(!r.ok){toast('Results not ready yet.');return;}idx=await r.json();}catch(_){toast('Failed to load results.');return;}schedIndex=idx.schedules||[];hide('sectionUpload');hide('sectionProgress');show('sectionResults');show('btnNewJob');const url=new URL(window.location.href);url.searchParams.set('job',id);history.replaceState({},'',url);const totalItems=idx.total_line_items||(schedIndex.reduce((s,x)=>s+x.total_line_items,0));const totalMatched=idx.total_matched||(schedIndex.reduce((s,x)=>s+(x.matched||0),0));const matchPct=idx.overall_match_rate_pct||(totalItems?Math.round(totalMatched/totalItems*100):0);$('resultsMeta').textContent=`${schedIndex.length} schedules \u00b7 ${totalItems.toLocaleString()} line items \u00b7 ${totalMatched.toLocaleString()} matched (${matchPct}%)`;$('summaryCards').innerHTML=[{l:'Schedules',v:schedIndex.length},{l:'Total Items',v:totalItems.toLocaleString()},{l:'Matched',v:totalMatched.toLocaleString()},{l:'Unmatched',v:(totalItems-totalMatched).toLocaleString()},{l:'Match Rate',v:matchPct+'%'}].map(c=>`<div class="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm"><p class="text-xs font-medium text-slate-500 uppercase tracking-wide">${c.l}</p><p class="text-xl font-bold text-slate-900 mt-1">${c.v}</p></div>`).join('');$('jobInfoModel').textContent=idx.extract_model||'\u2014';$('jobInfoMode').textContent=idx.extract_mode||'\u2014';$('jobInfoTier').textContent=idx.parse_tier||'agentic';$('jobInfoTime').textContent=idx.pipeline_elapsed_s?`${Math.floor(idx.pipeline_elapsed_s/60)}m ${Math.round(idx.pipeline_elapsed_s%60)}s`:'\u2014';$('jobInfoForm').textContent=idx.form_pdf||'\u2014';$('jobInfoInstr').textContent=idx.instr_pdf||'\u2014';$('jobInfoDate').textContent=idx.completed_at?new Date(idx.completed_at).toLocaleString():'\u2014';$('jobInfoId').textContent=id;show('jobInfoPanel');$('scheduleTabs').innerHTML=schedIndex.map((s,i)=>`<button onclick="selSchedule('${s.label}',this)" data-label="${s.label}" class="sched-tab flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 text-slate-600 hover:bg-blue-50 hover:border-blue-300 transition-all ${i===0?'tab-active':''}">${matchDot(s.match_rate_pct||0)}${s.schedule}<span class="opacity-60">${s.match_rate_pct!=null?s.match_rate_pct+'%':''}</span><span onclick="downloadSchedule('${s.label}',event)" title="Download JSON" class="ml-0.5 opacity-40 hover:opacity-100 transition-opacity hover:text-blue-600 select-none">\u2b07</span></button>`).join('');if(schedIndex.length)selSchedule(schedIndex[0].label,$('scheduleTabs').querySelector('[data-label]'));}
+async function selSchedule(label,tabEl){document.querySelectorAll('.sched-tab').forEach(t=>t.classList.remove('tab-active'));tabEl?.classList.add('tab-active');try{const r=await fetch(`/api/jobs/${jobId}/results/${label}`);if(!r.ok){toast('Could not load schedule.');return;}const data=await r.json();allItems=[...(data.line_items||[]),...(data.instruction_only||[]).map(x=>({...x,_io:true}))];$('filterMatch').value='';$('filterType').value='';sortKey=null;sortDir=1;document.querySelectorAll('.sort-ind').forEach(e=>e.textContent='');filterTable();}catch(_){toast('Error loading schedule.');}}
+function downloadSchedule(label,e){e.stopPropagation();const a=document.createElement('a');a.href=`/api/jobs/${jobId}/results/${label}`;a.download=`${label}.json`;a.click();}
+function copyShareLink(){const url=new URL(window.location.href);url.searchParams.set('job',jobId);navigator.clipboard.writeText(url.toString()).then(()=>toast('Link copied to clipboard!'));}
+function toggleHierarchy(){hierarchyMode=!hierarchyMode;$('hierarchyLabel').textContent=hierarchyMode?'Flat View':'Hierarchy';filterTable();}
+function buildTree(items){const byRef={};items.forEach(item=>{if(item.reference_number)byRef[item.reference_number]={...item,_children:[],_depth:0};});const roots=[];items.forEach(item=>{if(!item.reference_number){roots.push({...item,_children:[],_depth:0});return;}const obj=byRef[item.reference_number];const par=item.parent_line_item&&byRef[item.parent_line_item];if(par){obj._depth=(par._depth||0)+1;par._children.push(obj);}else{obj._depth=0;roots.push(obj);}});const flat=[];function flatten(node){flat.push(node);node._children.forEach(flatten);}roots.forEach(flatten);return flat;}
+function setSort(key){if(sortKey===key)sortDir*=-1;else{sortKey=key;sortDir=1;}document.querySelectorAll('.sort-ind').forEach(e=>e.textContent='');const ind=$(`si-${key}`);if(ind)ind.textContent=sortDir>0?' \u25b2':' \u25bc';filterTable();}
+function copyMDRM(el,code,e){if(e)e.stopPropagation();navigator.clipboard.writeText(code).then(()=>{const orig=el.style.background;el.title='Copied!';el.style.background='#dcfce7';setTimeout(()=>{el.style.background=orig;el.title='Click to copy';},1200);});}
+function filterTable(){const q=$('searchBox').value.toLowerCase();const f=$('filterMatch').value;const t=$('filterType').value.toLowerCase();let rows=allItems.filter(item=>{if(f==='matched'&&!item.match_status?.startsWith('matched'))return false;if(f==='no_instruction'&&item.match_status!=='no_instruction_found')return false;if(f==='instruction_only'&&item.match_status!=='instruction_only_no_form_item')return false;if(t&&(item.data_type||'').toLowerCase()!==t)return false;if(!q)return true;return[item.reference_number,item.description,item.mdrm_code,item.mdrm_prefix,item.instruction_title,item.instruction_text].filter(Boolean).join(' ').toLowerCase().includes(q);});if(sortKey){rows.sort((a,b)=>{if(sortKey==='confidence'){return((parseFloat(a.confidence)||0)-(parseFloat(b.confidence)||0))*sortDir;}const va=(a[sortKey]!=null?String(a[sortKey]):'').toLowerCase();const vb=(b[sortKey]!=null?String(b[sortKey]):'').toLowerCase();return va<vb?-sortDir:va>vb?sortDir:0;});}if(hierarchyMode)rows=buildTree(rows);renderTable(rows);}
+function matchDot(pct){const c=pct>=80?'#22c55e':pct>=50?'#f59e0b':'#ef4444';return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c};flex-shrink:0;margin-top:1px"></span>`;}
+function mdrmChip(item){if(!item.mdrm_code&&!item.mdrm_prefix)return '<span class="text-slate-300">\u2014</span>';const code=`${item.mdrm_prefix||'BHCK'} ${item.mdrm_code||''}`.trim();return `<span onclick="copyMDRM(this,'${esc(code)}',event)" title="Click to copy" class="font-mono text-xs bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded cursor-pointer hover:bg-green-50 hover:border-green-300 transition-colors select-all inline-block">${esc(code)}</span>`;}
+function confBadge(item){if(item.confidence==null)return '';const pct=Math.round(item.confidence*100);const cls=pct>=80?'bg-green-100 text-green-700':pct>=60?'bg-amber-100 text-amber-700':'bg-red-100 text-red-700';return `<span class="px-1.5 py-0.5 ${cls} rounded text-xs font-medium">${pct}%</span>`;}
+function statusBadge(s){if(!s)return '';if(s.startsWith('matched'))return '<span class="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs">Matched</span>';if(s==='no_instruction_found')return '<span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs">No Instr.</span>';if(s==='instruction_only_no_form_item')return '<span class="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs">Instr Only</span>';return `<span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">${esc(s)}</span>`;}
+function renderTable(rows){_renderedRows=rows;const matched=rows.filter(r=>r.match_status?.startsWith('matched')&&!r._io).length;const nonIO=rows.filter(r=>!r._io).length;const rate=nonIO?Math.round(matched/nonIO*100):0;$('footerCount').textContent=`${rows.length.toLocaleString()} of ${allItems.length.toLocaleString()} items`;$('footerMatchRate').textContent=rows.length?`Match rate: ${rate}%`:'';$('rowCountBadge').textContent=rows.length!==allItems.length?`Showing ${rows.length} of ${allItems.length} items`:`${allItems.length} items`;if(!rows.length){$('resultsBody').innerHTML=`<tr><td colspan="7" class="px-4 py-10 text-center text-slate-400 text-sm">No items match.</td></tr>`;return;}$('resultsBody').innerHTML=rows.map((item,i)=>{const depth=Math.min(item._depth||0,5);const dc=depth>0?`d${depth}`:'';const hasKids=item._children&&item._children.length>0;const instrPreview=item.instruction_text?`<span class="text-slate-600 text-xs">${esc(item.instruction_text.slice(0,180))}${item.instruction_text.length>180?'\u2026':''}</span>`:'<span class="text-slate-300">\u2014</span>';return `<tr class="hover:bg-slate-50 transition-colors cursor-pointer" onclick="_openDrawer(${i})"><td class="px-4 py-2.5 align-top ${dc}">${hasKids?'<span class="text-slate-300 mr-1 text-xs">\u229e</span>':''}<span class="font-mono text-xs font-semibold text-slate-700 whitespace-nowrap">${esc(item.reference_number||'\u2014')}</span></td><td class="px-4 py-2.5 align-top text-xs text-slate-700 max-w-xs">${esc(item.description||item.instruction_title||'\u2014')}</td><td class="px-4 py-2.5 align-top">${mdrmChip(item)}</td><td class="px-4 py-2.5 align-top text-xs text-slate-500 whitespace-nowrap">${esc(item.data_type||'\u2014')}</td><td class="px-4 py-2.5 align-top max-w-sm">${instrPreview}</td><td class="px-4 py-2.5 align-top">${confBadge(item)}</td><td class="px-4 py-2.5 align-top">${statusBadge(item.match_status)}</td></tr>`;}).join('');}
+function _openDrawer(i){showDrawer(_renderedRows[i]);}
+function showDrawer(item){if(!item)return;$('drawerBody').innerHTML=renderDrawerContent(item);$('rowDrawer').classList.add('open');$('drawerOverlay').classList.add('open');}
+function closeDrawer(){$('rowDrawer').classList.remove('open');$('drawerOverlay').classList.remove('open');}
+function drawerField(label,val,mono){if(val===null||val===undefined||val==='')return '';const cls=mono?'font-mono text-xs text-slate-700':'text-sm text-slate-700';return `<div class="mb-3 pb-3 border-b border-slate-100 last:border-0"><p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">${label}</p><p class="${cls} leading-relaxed">${esc(String(val))}</p></div>`;}
+function renderDrawerContent(item){const mdrm=item.mdrm_code?(item.mdrm_prefix||'BHCK')+' '+item.mdrm_code:null;const fn=Array.isArray(item.footnotes)&&item.footnotes.length?item.footnotes.join(' | '):null;const cr=Array.isArray(item.cross_references)&&item.cross_references.length?item.cross_references.join(', '):null;return drawerField('Reference Number',item.reference_number,true)+drawerField('Description',item.description)+drawerField('Schedule',item.schedule_name)+drawerField('Section',item.section)+drawerField('MDRM',mdrm,true)+drawerField('Data Type',item.data_type)+drawerField('Parent Line Item',item.parent_line_item,true)+(item.is_total_or_subtotal!=null?drawerField('Is Total / Subtotal',item.is_total_or_subtotal?'Yes':'No'):'')+drawerField('Reporting Threshold',item.reporting_threshold)+(fn?drawerField('Footnotes',fn):'')+drawerField('Match Status',item.match_status)+(item.confidence!=null?drawerField('Confidence Score',Math.round(item.confidence*100)+'%'):'')+(item.instruction_title?drawerField('Instruction Title',item.instruction_title):'')+( item.instruction_text?`<div class="mb-3 pb-3 border-b border-slate-100"><p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Instruction Text</p><p class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">${esc(item.instruction_text)}</p></div>`:'' )+(cr?drawerField('Cross References',cr):'')+drawerField('Reporting Guidance',item.reporting_guidance)+drawerField('Effective Date',item.effective_date);}
+function exportCSV(){const q=$('searchBox').value.toLowerCase();const f=$('filterMatch').value;const t=$('filterType').value.toLowerCase();const rows=allItems.filter(item=>{if(f==='matched'&&!item.match_status?.startsWith('matched'))return false;if(f==='no_instruction'&&item.match_status!=='no_instruction_found')return false;if(f==='instruction_only'&&item.match_status!=='instruction_only_no_form_item')return false;if(t&&(item.data_type||'').toLowerCase()!==t)return false;if(!q)return true;return[item.reference_number,item.description,item.mdrm_code,item.mdrm_prefix,item.instruction_title,item.instruction_text].filter(Boolean).join(' ').toLowerCase().includes(q);});const hdrs=['Ref #','Description','MDRM Prefix','MDRM Code','Data Type','Is Total','Parent','Schedule','Reporting Threshold','Match Status','Confidence','Instruction Title','Instruction Text'];const csv=[hdrs,...rows.map(item=>[item.reference_number||'',item.description||'',item.mdrm_prefix||'',item.mdrm_code||'',item.data_type||'',item.is_total_or_subtotal!=null?(item.is_total_or_subtotal?'Yes':'No'):'',item.parent_line_item||'',item.schedule_name||'',item.reporting_threshold||'',item.match_status||'',item.confidence!=null?Math.round(item.confidence*100)+'%':'',item.instruction_title||'',(item.instruction_text||'').replace(/\r?\n/g,' ')])].map(r=>r.map(cell=>'"'+String(cell).replace(/"/g,'""')+'"').join(',')).join('\n');const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`FRY9C_${jobId?.slice(0,8)||'export'}.csv`;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);toast(`Exported ${rows.length} rows as CSV`);}
+function exportResults(){if(jobId)window.location.href=`/api/jobs/${jobId}/export`;}
 loadPrevJobs();
 loadDefaultProjectPdfs();
+const _urlJob=new URLSearchParams(location.search).get('job');
+if(_urlJob){show('btnNewJob');loadJobResults(_urlJob);}
 </script>
 </body>
 </html>
