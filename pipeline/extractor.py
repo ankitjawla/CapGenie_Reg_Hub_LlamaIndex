@@ -275,19 +275,81 @@ def extract_schedule(
     return result
 
 
+def _list_of_dict_records(v: Any) -> list[dict[str, Any]] | None:
+    """If *v* is a non-empty list of dict-like objects, return plain dicts; else None."""
+    if not isinstance(v, list) or not v:
+        return None
+    if not all(isinstance(x, dict) for x in v):
+        return None
+    return [_to_dict(item) for item in v]
+
+
+def _records_from_mapping(d: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """Find the first list-of-dicts in common LlamaExtract response shapes."""
+    for key in (
+        "items",
+        "line_items",
+        "records",
+        "data",
+        "rows",
+        "results",
+        "output",
+        "table_rows",
+        "extracted_data",
+    ):
+        if key in d:
+            got = _list_of_dict_records(d[key])
+            if got is not None:
+                return got
+    # Nested object (e.g. {"extraction": {"rows": [...]}})
+    for v in d.values():
+        if isinstance(v, dict):
+            nested = _records_from_mapping(v)
+            if nested:
+                return nested
+        got = _list_of_dict_records(v)
+        if got is not None:
+            return got
+    return None
+
+
 def _unwrap_run_data(run: Any) -> list[dict[str, Any]]:
-    """Unwrap JobGetResultResponse.data to a flat list of plain dicts."""
-    data = getattr(run, "data", None) if not isinstance(run, dict) else run.get("data")
-    if data is None:
+    """
+    Unwrap ``JobGetResultResponse`` (or dict) to a flat list of line-item dicts.
+
+    Primary field is ``data`` (list or object with known array keys). Some API
+    versions place row arrays under ``extraction_metadata`` instead; we scan
+    both to avoid silently saving empty extractions.
+    """
+    if isinstance(run, dict):
+        data = run.get("data")
+        meta = run.get("extraction_metadata")
+    else:
+        data = getattr(run, "data", None)
+        meta = getattr(run, "extraction_metadata", None)
+
+    if data is None and meta is None:
         return []
+
     if isinstance(data, list):
         return [_to_dict(item) for item in data]
+
     if isinstance(data, dict):
-        for key in ("items", "line_items", "records", "data"):
-            if key in data and isinstance(data[key], list):
-                return [_to_dict(i) for i in data[key]]
+        from_data = _records_from_mapping(data)
+        if from_data:
+            return from_data
+        # Single extracted object (not PER_TABLE_ROW batch) — keep as one row
         return [data]
-    return [_to_dict(data)]
+
+    if data is not None:
+        return [_to_dict(data)]
+
+    if isinstance(meta, dict):
+        from_meta = _records_from_mapping(meta)
+        if from_meta:
+            return from_meta
+
+    return []
 
 
 def _to_dict(obj: Any) -> dict:
