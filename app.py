@@ -48,6 +48,15 @@ from pipeline.processor import ProgressEvent, run_pipeline
 
 load_dotenv()
 
+
+def _llama_cloud_key_configured() -> bool:
+    """True if any supported LlamaCloud API key env var is non-empty (no SDK import)."""
+    for var in ("LLAMA_CLOUD_API_KEY", "LLAMA_PARSE_API_KEY", "LLAMA_API_KEY"):
+        if os.environ.get(var, "").strip():
+            return True
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Directory setup
 # ---------------------------------------------------------------------------
@@ -82,6 +91,19 @@ _event_signals: dict[str, asyncio.Event] = {}
 _event_lock = threading.Lock()
 # Uvicorn's running loop — set on startup so worker threads can wake SSE waiters.
 _main_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _health_body() -> dict:
+    """Payload for liveness/readiness probes (no external API calls)."""
+    writable = os.access(RESULTS_DIR, os.W_OK)
+    return {
+        "status": "ok" if writable and _llama_cloud_key_configured() else "degraded",
+        "llama_cloud_key_configured": _llama_cloud_key_configured(),
+        "results_dir": str(RESULTS_DIR),
+        "results_dir_writable": writable,
+        "event_loop_captured": _main_loop is not None,
+    }
+
 
 # Schedule labels match pipeline output: Schedule_HC, Schedule_HC-B, etc.
 _SCHEDULE_LABEL_RE = re.compile(r"^Schedule_[A-Za-z0-9_.-]+$")
@@ -175,6 +197,19 @@ async def _capture_main_event_loop() -> None:
     """Required for SSE: pipeline runs in a thread and must signal this loop."""
     global _main_loop
     _main_loop = asyncio.get_running_loop()
+
+
+@app.get("/health")
+@app.get("/api/health")
+async def health():
+    """
+    Liveness / readiness for load balancers and operators.
+
+    Does not call LlamaCloud. Always returns HTTP 200 if the process is up.
+    ``status`` is ``ok`` when an API key is configured and ``results/`` is writable;
+    otherwise ``degraded`` (use for alerts; avoids restart loops on liveness probes).
+    """
+    return JSONResponse(_health_body())
 
 
 # ---------------------------------------------------------------------------

@@ -91,11 +91,16 @@ uploads/                     # Uploaded PDFs (gitignored)
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `POST /api/run` | POST | Start a pipeline job (upload or use project PDFs). Returns `{job_id}`. |
+| `GET /health` , `GET /api/health` | GET | Liveness: no LlamaCloud calls. JSON includes `status` (`ok` or `degraded`), `llama_cloud_key_configured`, `results_dir_writable`, `event_loop_captured`. |
+| `POST /api/upload` | POST | Upload form + instruction PDFs; returns `{job_id}`. |
+| `POST /api/start-default` | POST | Run pipeline on project-root default PDFs if present. |
 | `GET /api/jobs/{job_id}/stream` | GET | SSE stream of `ProgressEvent` objects for real-time UI updates. |
-| `GET /api/jobs/{job_id}/result` | GET | Final combined JSON for a completed job. |
-| `GET /api/jobs` | GET | List all jobs with status. |
-| `GET /api/cache/stats` | GET | Disk cache entry counts. |
+| `GET /api/jobs/{job_id}/status` | GET | Same events as JSON (polling fallback). |
+| `GET /api/jobs/{job_id}/results` | GET | Job `index.json` (schedule list + totals). |
+| `GET /api/jobs/{job_id}/results/{schedule_label}` | GET | One schedule combined JSON. |
+| `GET /api/jobs/{job_id}/export` | GET | ZIP of all schedule JSON files. |
+| `GET /api/jobs` | GET | List completed jobs from disk. |
+| `GET /api/default-files` | GET | Whether default project PDFs exist. |
 
 ---
 
