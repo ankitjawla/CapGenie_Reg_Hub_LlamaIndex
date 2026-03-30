@@ -24,7 +24,11 @@ from typing import Any, Callable
 
 import os
 from pipeline.extractor import extract_schedules_batch, parse_pdf, ExtractResult
-from pipeline.extract_settings import resolve_extract_model, resolve_extract_mode, build_extract_config
+from pipeline.extract_settings import (
+    build_extract_config,
+    resolve_extract_mode,
+    resolve_extract_model,
+)
 from pipeline.matcher import build_combined_output, save_combined_output
 from pipeline.splitter import get_schedule_names, split_pdf_by_schedule
 
@@ -506,6 +510,7 @@ def run_pipeline(
         overall_match_rate = (total_matched / total_items * 100) if total_items else 0
 
         # Write top-level index
+        _form_cfg_final = build_extract_config("form")
         index = {
             "job_id": job_dir.name,
             "form_pdf": form_pdf.name,
@@ -513,6 +518,8 @@ def run_pipeline(
             "form_pages": form_parse.pages,
             "instr_pages": instr_parse.pages,
             "extract_model": resolve_extract_model(),
+            "extract_mode": _form_cfg_final.get("extraction_mode"),
+            "parse_tier": os.environ.get("FRY9C_PARSE_TIER", "agentic").strip().lower(),
             "schedules": schedule_summary,
             "total_line_items": total_items,
             "total_matched": total_matched,

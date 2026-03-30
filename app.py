@@ -28,7 +28,9 @@ GET   /
 
 import asyncio
 import json
+import logging
 import os
+import re
 import shutil
 import threading
 import uuid
@@ -78,18 +80,23 @@ _event_store: dict[str, list[str]] = {}
 # Maps job_id -> asyncio.Event signalled when new events arrive
 _event_signals: dict[str, asyncio.Event] = {}
 _event_lock = threading.Lock()
+# Uvicorn's running loop — set on startup so worker threads can wake SSE waiters.
+_main_loop: asyncio.AbstractEventLoop | None = None
+
+# Schedule labels match pipeline output: Schedule_HC, Schedule_HC-B, etc.
+_SCHEDULE_LABEL_RE = re.compile(r"^Schedule_[A-Za-z0-9_.-]+$")
 
 
 def _signal_new_event(job_id: str, event_json: str) -> None:
     """Thread-safe: append event and wake any waiting SSE generators."""
     with _event_lock:
         _event_store.setdefault(job_id, []).append(event_json)
-    # Signal the asyncio event from a thread-safe context
     signal = _event_signals.get(job_id)
-    if signal is not None:
+    if signal is None:
+        return
+    loop = _main_loop
+    if loop is not None and loop.is_running():
         try:
-            # schedule set() on the event loop if we're in a thread
-            loop = asyncio.get_event_loop()
             loop.call_soon_threadsafe(signal.set)
         except RuntimeError:
             pass
@@ -111,7 +118,8 @@ def _run_pipeline_thread(job_id: str, job_dir: Path, form_pdf: Path, instr_pdf: 
     try:
         run_pipeline(job_dir, form_pdf, instr_pdf, on_progress=cb)
     except Exception:
-        pass  # error already emitted via callback inside run_pipeline
+        # run_pipeline emits step 0 "error" before re-raising; log for server operators.
+        logging.getLogger(__name__).exception("Pipeline failed for job %s", job_id)
 
 
 def _resolve_default_project_pdfs() -> tuple[Path, Path] | None:
@@ -162,9 +170,25 @@ def _enqueue_pipeline_job(form_path: Path, instr_pdf: Path) -> str:
 app = FastAPI(title="FRY9C Extraction API", version="1.0.0")
 
 
+@app.on_event("startup")
+async def _capture_main_event_loop() -> None:
+    """Required for SSE: pipeline runs in a thread and must signal this loop."""
+    global _main_loop
+    _main_loop = asyncio.get_running_loop()
+
+
 # ---------------------------------------------------------------------------
 # Default project PDFs (no browser upload)
 # ---------------------------------------------------------------------------
+
+
+def _safe_upload_name(filename: str | None, fallback: str) -> str:
+    """Use basename only — rejects path components like ../."""
+    name = (filename or fallback).strip()
+    base = Path(name).name
+    if not base or base in (".", ".."):
+        return fallback
+    return base
 
 @app.get("/api/default-files")
 async def default_files():
@@ -238,8 +262,10 @@ async def upload_pdfs(
     job_dir = RESULTS_DIR / job_id
     job_dir.mkdir(parents=True)
 
-    form_path = job_dir / f"form_{form_pdf.filename}"
-    instr_path = job_dir / f"instr_{instr_pdf.filename}"
+    form_name = _safe_upload_name(form_pdf.filename, "form.pdf")
+    instr_name = _safe_upload_name(instr_pdf.filename, "instr.pdf")
+    form_path = job_dir / f"form_{form_name}"
+    instr_path = job_dir / f"instr_{instr_name}"
 
     for upload, dest in ((form_pdf, form_path), (instr_pdf, instr_path)):
         async with aiofiles.open(dest, "wb") as fh:
@@ -350,8 +376,23 @@ async def get_results_index(job_id: str):
 @app.get("/api/jobs/{job_id}/results/{schedule_label}")
 async def get_schedule_result(job_id: str, schedule_label: str):
     """Return the combined JSON for a specific schedule."""
-    result_path = RESULTS_DIR / job_id / "results" / f"{schedule_label}_combined.json"
-    if not result_path.exists():
+    if not _SCHEDULE_LABEL_RE.match(schedule_label):
+        raise HTTPException(status_code=400, detail="Invalid schedule label.")
+    root = RESULTS_DIR.resolve()
+    job_dir = (RESULTS_DIR / job_id).resolve()
+    try:
+        job_dir.relative_to(root)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    if not job_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Job not found.")
+    subdir = (job_dir / "results").resolve()
+    result_path = (subdir / f"{schedule_label}_combined.json").resolve()
+    try:
+        result_path.relative_to(subdir)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid path.")
+    if not result_path.is_file():
         raise HTTPException(status_code=404, detail=f"Result for '{schedule_label}' not found.")
     return JSONResponse(json.loads(result_path.read_text()))
 

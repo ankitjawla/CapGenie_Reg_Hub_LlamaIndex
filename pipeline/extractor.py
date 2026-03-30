@@ -332,7 +332,14 @@ def _unwrap_run_data(run: Any) -> list[dict[str, Any]]:
         return []
 
     if isinstance(data, list):
-        return [_to_dict(item) for item in data]
+        out: list[dict[str, Any]] = []
+        for item in data:
+            if isinstance(item, dict):
+                out.append(_to_dict(item))
+            elif hasattr(item, "model_dump") or hasattr(item, "dict"):
+                out.append(_to_dict(item))
+            # Skip scalars / malformed entries — avoids TypeError from vars(str).
+        return out
 
     if isinstance(data, dict):
         from_data = _records_from_mapping(data)
