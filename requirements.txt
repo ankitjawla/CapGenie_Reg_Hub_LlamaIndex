@@ -16,7 +16,6 @@ llama-index-embeddings-azure-openai==0.5.2
 pypdf==6.9.2
 
 # Async utilities
-nest-asyncio==1.6.0
 
 # Utilities
 python-dotenv==1.2.2

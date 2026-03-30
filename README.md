@@ -19,7 +19,7 @@ The FRY9C reference package (Extraction Guide, walkthrough, sample PDFs/JSON) is
 | Context window | `num_pages_context` auto-sized: 1 for HI/HI-A/HI-B; 2 for HC sub-schedules |
 | Schemas | Enriched field descriptions with FRY9C-specific extraction hints and examples |
 | Concurrency | All schedule PDFs submitted to LlamaExtract **concurrently** via `asyncio.gather` |
-| Event loop | `nest_asyncio` patch — safe to run from FastAPI background tasks |
+| Event loop | Pipeline runs in a background thread with `asyncio.run()` (no nesting under uvicorn uvloop) |
 | Cache keys | Parse fingerprint now encodes full Azure endpoint/deployment/version values |
 | Cache TTL | `CACHE_MAX_AGE_DAYS` env var evicts stale cache entries (default: no TTL) |
 | Unclassified PDFs | Skipped in extraction steps with a SSE warning event (saves API credits) |
@@ -38,7 +38,7 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env: set LLAMA_CLOUD_API_KEY (required)
 
-uvicorn main:app --reload
+uvicorn app:app --reload
 # Open http://localhost:8000
 ```
 

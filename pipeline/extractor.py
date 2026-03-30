@@ -5,8 +5,8 @@ LlamaParse: AsyncLlamaCloud.parsing.parse()  — agentic tier, per-page text.
 LlamaExtract: AsyncLlamaCloud.extraction.extract() — concurrent across schedules.
 
 Both steps are backed by a versioned disk cache (parse tier/version + extract config).
-The SDK handles retries internally (configurable via max_retries); a nest_asyncio
-patch lets parse_pdf() be called safely from within a running event loop.
+The SDK handles retries internally (configurable via max_retries). parse_pdf runs
+asyncio.run() from a worker thread (see app.py), not nested under uvicorn's loop.
 """
 
 import asyncio
@@ -17,7 +17,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Literal
 
-import nest_asyncio  # noqa: E402
 from dotenv import load_dotenv
 
 from pipeline.cache import (
@@ -32,7 +31,6 @@ from pipeline.extract_settings import (
     num_pages_context_for_schedule,
 )
 
-nest_asyncio.apply()
 load_dotenv()
 
 _PAGE_SEP = "\n\n---\n\n"
@@ -135,7 +133,6 @@ def parse_pdf(pdf_path: Path) -> ParseResult:
     Parse *pdf_path* with LlamaParse (agentic tier by default).
 
     Set ``FRY9C_PARSE_TIER`` to ``cost_effective`` or ``fast`` for cheaper parsing.
-    nest_asyncio ensures this is safe to call from within a running event loop.
     """
     return asyncio.run(_parse_async(pdf_path))
 
