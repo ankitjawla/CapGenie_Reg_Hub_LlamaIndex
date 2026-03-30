@@ -1,77 +1,125 @@
 # CapGenie Reg Hub — FRY9C LlamaCloud pipeline
 
-FastAPI web app that ingests **FR Y-9C Form** and **Instruction** PDFs, runs **LlamaParse** (page-level text/markdown), splits by schedule, runs **LlamaExtract** against JSON schemas, then matches form line items to instruction text. Progress is streamed over **Server-Sent Events (SSE)**.
+FastAPI web app that ingests **FR Y-9C Form** and **Instruction** PDFs, runs **LlamaParse** (agentic tier, per-page text), splits by schedule, runs **LlamaExtract** concurrently against JSON schemas, then matches form line items to instruction text. Progress is streamed over **Server-Sent Events (SSE)**.
 
 The FRY9C reference package (Extraction Guide, walkthrough, sample PDFs/JSON) is **not** in this repository. Add a local folder such as `FRY9C_Package_for_Ankit-2/` if you use those materials (that path is gitignored).
 
-## Requirements
+---
 
-- Python 3.11+ (recommended)
-- Active [LlamaCloud](https://cloud.llamaindex.ai/) account and API key (parsing and extraction consume credits)
+## What's new (latest iteration)
 
-## Setup
+| Area | Improvement |
+|---|---|
+| SDK | Migrated from deprecated `llama-cloud-services` → `llama-cloud>=1.0` (AsyncLlamaCloud) |
+| Parse | **Agentic tier** by default (`FRY9C_PARSE_TIER=agentic`); change to `cost_effective`/`fast` to save credits |
+| Extract mode | **PREMIUM** when an extract model is explicitly configured; **MULTIMODAL** (default) otherwise |
+| Extract model | `LLAMA_EXTRACT_MODEL` → `AZURE_OPENAI_DEPLOYMENT` → `openai-gpt-4-1` fallback chain |
+| Accuracy | `confidence_scores=True`, `cite_sources=True`, `use_reasoning=True`, `high_resolution_mode=True` |
+| Chunk mode | `PAGE` for form schedules (dense tables); `SECTION` for instruction PDFs (narrative text) |
+| Context window | `num_pages_context` auto-sized: 1 for HI/HI-A/HI-B; 2 for HC sub-schedules |
+| Schemas | Enriched field descriptions with FRY9C-specific extraction hints and examples |
+| Concurrency | All schedule PDFs submitted to LlamaExtract **concurrently** via `asyncio.gather` |
+| Event loop | `nest_asyncio` patch — safe to run from FastAPI background tasks |
+| Cache keys | Parse fingerprint now encodes full Azure endpoint/deployment/version values |
+| Cache TTL | `CACHE_MAX_AGE_DAYS` env var evicts stale cache entries (default: no TTL) |
+| Unclassified PDFs | Skipped in extraction steps with a SSE warning event (saves API credits) |
 
-```bash
-cd CapGenie_Llama_Index
-python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env
-# Edit .env — set at least LLAMA_API_KEY
-```
+---
 
-### Default project PDFs (optional)
-
-To use **Run with project PDFs** in the UI, copy your filing PDFs next to `app.py`:
-
-- `FR_Y-9C20260310_f.pdf` — Form  
-- `FR_Y-9C20260310_i.pdf` — Instructions  
-
-These filenames are gitignored so filings are not pushed to the remote.
-
-## Run the server
+## Quick start
 
 ```bash
+git clone https://github.com/ankitjawla/CapGenie_Reg_Hub_LlamaIndex.git
+cd CapGenie_Reg_Hub_LlamaIndex
+python3.11 -m venv .venv
 source .venv/bin/activate
-uvicorn app:app --reload --host 0.0.0.0 --port 8000
+pip install -r requirements.txt
+
+cp .env.example .env
+# Edit .env: set LLAMA_CLOUD_API_KEY (required)
+
+uvicorn main:app --reload
+# Open http://localhost:8000
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Upload both PDFs or start from default files when present.
+---
 
 ## Environment variables
 
-See [`.env.example`](.env.example). Summary:
+| Variable | Required | Description |
+|---|---|---|
+| `LLAMA_CLOUD_API_KEY` | Yes | LlamaCloud API key. Also accepts `LLAMA_PARSE_API_KEY` or legacy `LLAMA_API_KEY`. |
+| `LLAMA_EXTRACT_MODEL` | No | Force a specific extract model slug (e.g. `openai-gpt-4-1`). Enables PREMIUM mode automatically. |
+| `LLAMA_EXTRACT_MODE` | No | Override extraction mode: `PREMIUM`, `MULTIMODAL` (default), `BALANCED`, `FAST`. |
+| `FRY9C_PARSE_TIER` | No | LlamaParse tier: `agentic` (default), `cost_effective`, `fast`. |
+| `FRY9C_PARSE_VERSION` | No | LlamaParse model version, default `latest`. |
+| `FRY9C_SPLIT_MODE` | No | Schedule classification: `hybrid` (default) or `footer_only`. |
+| `CACHE_MAX_AGE_DAYS` | No | Evict cache entries older than this many days. `0` = keep forever (default). |
+| `AZURE_OPENAI_ENDPOINT` | No | Used as extract model fallback when `LLAMA_EXTRACT_MODEL` is unset. |
+| `AZURE_OPENAI_DEPLOYMENT` | No | Azure deployment name used as extract model fallback. |
+| `AZURE_OPENAI_API_VERSION` | No | Azure OpenAI API version. |
 
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `LLAMA_API_KEY` | Yes | LlamaParse and LlamaExtract |
-| `LLAMA_EXTRACT_MODEL` | No | Explicit extract model slug |
-| `AZURE_OPENAI_*` | No | Extract model fallback / optional parse Azure settings |
-
-Optional toggles: `FRY9C_PARSE_FAST_MODE`, `FRY9C_SPLIT_MODE` (`hybrid` or `footer_only`).
+---
 
 ## Project layout
 
-| Path | Role |
-|------|------|
-| `app.py` | FastAPI app, upload, SSE, static UI |
-| `pipeline/` | Parse, split, extract, match, cache |
-| `schemas/` | LlamaExtract JSON schemas |
-| `static/` | Single-page frontend |
-| `.cache/` | Local parse/extract cache (gitignored) |
-| `results/` | Per-job outputs (gitignored) |
+```
+main.py                      # FastAPI entrypoint, SSE streaming, job management
+pipeline/
+  cache.py                   # Disk-based SHA-256 content-addressed cache (parse + extract)
+  extract_settings.py        # LlamaExtract config: mode/model resolution, system prompts
+  extractor.py               # AsyncLlamaCloud parse + extract, batch concurrency, cache wiring
+  processor.py               # Pipeline orchestrator (5 steps); emits ProgressEvent objects
+  splitter.py                # Regex-based PDF → per-schedule PDF splitting
+  matcher.py                 # Join form + instruction extracted records
+schemas/
+  form_line_item_schema.json           # JSON schema for form line items (enriched hints)
+  instruction_line_item_schema.json    # JSON schema for instruction entries (enriched hints)
+static/                      # Frontend HTML/JS/CSS
+results/                     # Job output dirs (gitignored)
+.cache/                      # Parse + extract cache (gitignored)
+uploads/                     # Uploaded PDFs (gitignored)
+```
+
+---
 
 ## API highlights
 
-- `POST /api/upload` — upload Form + Instruction PDFs, returns `job_id`
-- `GET /api/jobs/{job_id}/stream` — SSE progress
-- `GET /api/jobs/{job_id}/results` — summary `index.json`
-- `GET /api/default-files` / `POST /api/start-default` — default root PDFs
+| Endpoint | Method | Description |
+|---|---|---|
+| `POST /api/run` | POST | Start a pipeline job (upload or use project PDFs). Returns `{job_id}`. |
+| `GET /api/jobs/{job_id}/stream` | GET | SSE stream of `ProgressEvent` objects for real-time UI updates. |
+| `GET /api/jobs/{job_id}/result` | GET | Final combined JSON for a completed job. |
+| `GET /api/jobs` | GET | List all jobs with status. |
+| `GET /api/cache/stats` | GET | Disk cache entry counts. |
 
-## License
+---
 
-Add a license file if you distribute this repository publicly.
+## Pipeline steps
+
+```
+Upload PDF(s)
+     │
+     ▼
+Step 1 — LlamaParse (agentic tier)
+     │   Converts each PDF page to plain text; pages separated by '---'
+     ▼
+Step 2 — Schedule splitter
+     │   Regex classifies each page (hybrid: header-first + footer, or footer_only)
+     │   Writes one PDF per schedule label to form_splits/ and instr_splits/
+     ▼
+Steps 3 & 4 — LlamaExtract (concurrent, per schedule)
+     │   Skips Unclassified pages
+     │   All schedules submitted concurrently via asyncio.gather
+     │   Results cached per (pdf_sha256 + schema + extract_config fingerprint)
+     ▼
+Step 5 — Matcher
+         Normalises reference numbers; joins form ↔ instruction records
+         Writes combined JSON + per-schedule JSON to results/<job_id>/
+```
+
+---
 
 ## Remote repository
 
-Primary GitHub remote: [https://github.com/ankitjawla/CapGenie_Reg_Hub_LlamaIndex](https://github.com/ankitjawla/CapGenie_Reg_Hub_LlamaIndex)
+https://github.com/ankitjawla/CapGenie_Reg_Hub_LlamaIndex

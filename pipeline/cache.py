@@ -11,8 +11,10 @@ Cache layout
     <sha256_of_pdf+schema+extract_cfg>.json  ← list of extracted records
     <sha256_of_pdf+schema+extract_cfg>.meta.json
 
-Parse keys version when result_type, fast_mode, or parse Azure options change.
-Extract keys version when schema or serialized LlamaExtract config (incl. model) changes.
+Parse keys encode: pdf content + parse tier + parse version + Azure endpoint hash.
+Extract keys encode: pdf content + schema text + extract config fingerprint.
+
+Set CACHE_MAX_AGE_DAYS to evict stale entries (default 0 = never evict locally).
 """
 
 import hashlib
@@ -43,27 +45,46 @@ def _sha256_str(s: str) -> str:
     return hashlib.sha256(s.encode()).hexdigest()
 
 
+def _cache_max_age_days() -> float:
+    """Return configured max age in days; 0 means no TTL."""
+    try:
+        return float(os.getenv("CACHE_MAX_AGE_DAYS", "0"))
+    except ValueError:
+        return 0.0
+
+
+def _is_stale(cached_at_iso: str) -> bool:
+    """Return True if the entry is older than CACHE_MAX_AGE_DAYS (when > 0)."""
+    max_age = _cache_max_age_days()
+    if max_age <= 0:
+        return False
+    try:
+        cached_at = datetime.fromisoformat(cached_at_iso)
+        age = (datetime.now(timezone.utc) - cached_at).total_seconds() / 86400
+        return age > max_age
+    except Exception:
+        return False
+
+
 def parse_options_fingerprint() -> str:
     """
     Stable token for current LlamaParse options (invalidates parse cache when changed).
 
-    Default: markdown + fast_mode (FRY9C_PARSE_FAST_MODE=true).
-    Set FRY9C_PARSE_FAST_MODE=false for plain text / non-fast experiments.
-    Includes whether Azure OpenAI env is present for parse (LlamaParse may route there).
+    Encodes: parse tier, parse version, and actual Azure endpoint value (if set).
+    Set FRY9C_PARSE_TIER to change tier (default: agentic).
     """
-    fast_md = os.getenv("FRY9C_PARSE_FAST_MODE", "true").strip().lower() not in (
-        "0",
-        "false",
-        "no",
-    )
+    tier = os.getenv("FRY9C_PARSE_TIER", "agentic").strip().lower()
+    version = os.getenv("FRY9C_PARSE_VERSION", "latest").strip()
     ep = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
-    key = os.getenv("AZURE_OPENAI_API_KEY", "").strip() or os.getenv("AZURE_OPENAI_KEY", "").strip()
-    parse_azure = bool(ep and key)
+    dep = os.getenv("AZURE_OPENAI_DEPLOYMENT", "").strip()
+    ver = os.getenv("AZURE_OPENAI_API_VERSION", "").strip()
     payload = json.dumps(
         {
-            "result_type": "markdown" if fast_md else "text",
-            "fast_mode": fast_md,
-            "parse_azure": parse_azure,
+            "tier": tier,
+            "version": version,
+            "azure_endpoint": _sha256_str(ep)[:12] if ep else "",
+            "azure_deployment": dep,
+            "azure_api_version": ver,
         },
         sort_keys=True,
     )
@@ -79,14 +100,15 @@ def parse_cache_key(pdf_path: Path) -> str:
 
 
 def get_cached_parse(pdf_path: Path) -> tuple[str, dict] | None:
-    """
-    Return (page_text, meta) if *pdf_path* is cached, else None.
-    """
+    """Return ``(page_text, meta)`` if cached and not stale, else ``None``."""
     key = parse_cache_key(pdf_path)
     txt = PARSE_CACHE / f"{key}.txt"
     meta_path = PARSE_CACHE / f"{key}.meta.json"
     if txt.exists() and meta_path.exists():
-        return txt.read_text(encoding="utf-8"), json.loads(meta_path.read_text())
+        meta = json.loads(meta_path.read_text())
+        if _is_stale(meta.get("cached_at", "")):
+            return None
+        return txt.read_text(encoding="utf-8"), meta
     return None
 
 
@@ -124,14 +146,15 @@ def get_cached_extract(
     schema_path: Path,
     extract_config_fp: str,
 ) -> tuple[list[dict], dict] | None:
-    """
-    Return (records, meta) if this (pdf, schema, extract config) triple is cached.
-    """
+    """Return ``(records, meta)`` if cached and not stale, else ``None``."""
     key = extract_cache_key(pdf_path, schema_path, extract_config_fp)
     data_path = EXTRACT_CACHE / f"{key}.json"
     meta_path = EXTRACT_CACHE / f"{key}.meta.json"
     if data_path.exists() and meta_path.exists():
-        return json.loads(data_path.read_text()), json.loads(meta_path.read_text())
+        meta = json.loads(meta_path.read_text())
+        if _is_stale(meta.get("cached_at", "")):
+            return None
+        return json.loads(data_path.read_text()), meta
     return None
 
 
@@ -170,4 +193,5 @@ def cache_stats() -> dict:
         "parse_entries": parse_count,
         "extract_entries": extract_count // 2,
         "cache_dir": str(CACHE_DIR),
+        "max_age_days": _cache_max_age_days(),
     }

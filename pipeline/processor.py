@@ -2,7 +2,7 @@
 Pipeline orchestrator for FRY9C extraction.
 
 Runs all 5 steps in sequence for a given job:
-  1. Parse  – LlamaParse (markdown + fast_mode by default; versioned cache)
+  1. Parse  – LlamaParse (agentic tier by default; versioned cache)
   2. Split  – per-schedule PDFs (hybrid header+footer or footer_only)
   3. Extract Forms     – LlamaExtract with form schema (cached per schedule)
   4. Extract Instructions – LlamaExtract with instruction schema (cached)
@@ -22,8 +22,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from pipeline.extractor import extract_schedule, parse_pdf
-from pipeline.extract_settings import resolve_extract_model
+import os
+from pipeline.extractor import extract_schedules_batch, parse_pdf, ExtractResult
+from pipeline.extract_settings import resolve_extract_model, resolve_extract_mode
 from pipeline.matcher import build_combined_output, save_combined_output
 from pipeline.splitter import get_schedule_names, split_pdf_by_schedule
 
@@ -138,8 +139,8 @@ def run_pipeline(
         emit(1, "Parse", "", "running", f"Parsing Form PDF ({form_size_mb} MB) with LlamaParse…", 0.0, {
             "file": form_pdf.name,
             "size_mb": form_size_mb,
-            "api": "LlamaParse (split_by_page; markdown + fast_mode by default)",
-            "what": "Per FRY9C Extraction Guide: one document per page, joined with '---' for schedule classification. Default markdown + fast_mode; set FRY9C_PARSE_FAST_MODE=false for text-only experiments.",
+            "api": f"LlamaParse (tier={os.environ.get('FRY9C_PARSE_TIER','agentic')})",
+            "what": "Per FRY9C Extraction Guide: LlamaParse agentic tier returns one page per document. Set FRY9C_PARSE_TIER=cost_effective or fast to reduce credit usage.",
         })
 
         form_parse = parse_pdf(form_pdf)
@@ -188,6 +189,7 @@ def run_pipeline(
                  "what": "Default hybrid: header in the first ~600 characters, then footer codes in the last ~400. Set FRY9C_SPLIT_MODE=footer_only for package-style footer-only rules. One PDF per schedule.",
                  "why": "Extraction accuracy improves when the model sees one schedule at a time.",
                  "split_mode": os.environ.get("FRY9C_SPLIT_MODE", "hybrid"),
+                 "note": "To use footer-only classification set FRY9C_SPLIT_MODE=footer_only",
              })
 
         form_mapping = split_pdf_by_schedule(form_parse.text, form_pdf, form_splits_dir)
@@ -238,6 +240,7 @@ def run_pipeline(
                  "what": "LlamaExtract (guide): PER_TABLE_ROW + BALANCED, SECTION chunking, high_resolution_mode, use_reasoning, num_pages_context=1, form system prompt. Schema: line_item_number, description, mdrm_code, mdrm_prefix, data_type, parent_line_item, is_total_or_subtotal, schedule_name, section, reporting_threshold, footnotes.",
                  "schema": "form_line_item_schema.json",
                  "extract_model": _extract_model,
+                 "extract_mode": resolve_extract_mode(),
                  "total_schedules": total_schedules,
              })
 
@@ -246,21 +249,49 @@ def run_pipeline(
         total_form_items = 0
         cache_hits_form = 0
 
-        for idx, sched_label in enumerate(form_schedules):
+        # Build tasks list — skip Unclassified PDFs (saves API credits)
+        form_tasks = []
+        for sched_label in form_schedules:
             pdf_path = form_splits_dir / f"{sched_label}.pdf"
             if not pdf_path.exists():
                 continue
-            pct = 20.0 + (idx / total_schedules) * 25.0
+            if sched_label == "Unclassified":
+                emit(3, "Extract Forms", sched_label, "running",
+                     "Skipping Unclassified pages — no schedule identity detected.", 20.5, {
+                         "schedule": sched_label, "skipped": True,
+                     })
+                continue
+            form_tasks.append((pdf_path, FORM_SCHEMA, "form", sched_label))
 
-            emit(3, "Extract Forms", sched_label, "running",
-                 f"Extracting {sched_label} ({idx+1}/{total_schedules})…", pct, {
-                     "schedule": sched_label,
-                     "file": pdf_path.name,
-                     "index": idx + 1,
-                     "total": total_schedules,
-                 })
+        emit(3, "Extract Forms", "", "running",
+             f"Submitting {len(form_tasks)} form schedule PDFs concurrently to LlamaExtract…", 21.0, {
+                 "batch_size": len(form_tasks),
+             })
 
-            result = extract_schedule(pdf_path, FORM_SCHEMA, "form")
+        def _form_progress(label, kind, result):
+            row = {
+                "schedule": label.replace("Schedule_", ""),
+                "items": result.items if not isinstance(result, Exception) else 0,
+                "elapsed_s": result.elapsed_s if not isinstance(result, Exception) else 0,
+                "from_cache": result.from_cache if not isinstance(result, Exception) else False,
+                "status": "done" if not isinstance(result, Exception) else "error",
+            }
+            cache_tag = " [CACHED]" if (not isinstance(result, Exception) and result.from_cache) else ""
+            items = result.items if not isinstance(result, Exception) else 0
+            elapsed = result.elapsed_s if not isinstance(result, Exception) else 0
+            emit(3, "Extract Forms", label,
+                 "cached" if (not isinstance(result, Exception) and result.from_cache) else "done",
+                 f"{label}{cache_tag}: {items} items in {_fmt_s(elapsed)}", 30.0, {"row": row})
+
+        form_batch = extract_schedules_batch(form_tasks, _form_progress)
+
+        for idx, sched_label in enumerate(form_schedules):
+            pdf_path = form_splits_dir / f"{sched_label}.pdf"
+            if not pdf_path.exists() or sched_label == "Unclassified":
+                continue
+            result = form_batch.get(sched_label)
+            if result is None:
+                result = ExtractResult(records=[], items=0, elapsed_s=0.0, from_cache=False)
             form_extraction[sched_label] = result.records
             total_form_items += result.items
             if result.from_cache:
@@ -307,6 +338,7 @@ def run_pipeline(
                  "what": "Same extract settings as forms with an instruction-specific system prompt (top-level headings; full instruction text). Schema: line_item_number, mdrm_code, mdrm_prefix, line_item_title, instruction_text, schedule_name, cross_references, reporting_guidance, effective_date.",
                  "schema": "instruction_line_item_schema.json",
                  "extract_model": _extract_model,
+                 "extract_mode": resolve_extract_mode(),
                  "total_schedules": total_instr,
              })
 
@@ -315,21 +347,49 @@ def run_pipeline(
         total_instr_items = 0
         cache_hits_instr = 0
 
-        for idx, sched_label in enumerate(instr_schedules):
+        # Build tasks list — skip Unclassified PDFs
+        instr_tasks = []
+        for sched_label in instr_schedules:
             pdf_path = instr_splits_dir / f"{sched_label}.pdf"
             if not pdf_path.exists():
                 continue
-            pct = 45.0 + (idx / total_instr) * 30.0
+            if sched_label == "Unclassified":
+                emit(4, "Extract Instructions", sched_label, "running",
+                     "Skipping Unclassified pages — no schedule identity detected.", 45.5, {
+                         "schedule": sched_label, "skipped": True,
+                     })
+                continue
+            instr_tasks.append((pdf_path, INSTR_SCHEMA, "instruction", sched_label))
 
-            emit(4, "Extract Instructions", sched_label, "running",
-                 f"Extracting instructions for {sched_label} ({idx+1}/{total_instr})…", pct, {
-                     "schedule": sched_label,
-                     "file": pdf_path.name,
-                     "index": idx + 1,
-                     "total": total_instr,
-                 })
+        emit(4, "Extract Instructions", "", "running",
+             f"Submitting {len(instr_tasks)} instruction schedule PDFs concurrently to LlamaExtract…", 46.0, {
+                 "batch_size": len(instr_tasks),
+             })
 
-            result = extract_schedule(pdf_path, INSTR_SCHEMA, "instruction")
+        def _instr_progress(label, kind, result):
+            row = {
+                "schedule": label.replace("Schedule_", ""),
+                "items": result.items if not isinstance(result, Exception) else 0,
+                "elapsed_s": result.elapsed_s if not isinstance(result, Exception) else 0,
+                "from_cache": result.from_cache if not isinstance(result, Exception) else False,
+                "status": "done" if not isinstance(result, Exception) else "error",
+            }
+            cache_tag = " [CACHED]" if (not isinstance(result, Exception) and result.from_cache) else ""
+            items = result.items if not isinstance(result, Exception) else 0
+            elapsed = result.elapsed_s if not isinstance(result, Exception) else 0
+            emit(4, "Extract Instructions", label,
+                 "cached" if (not isinstance(result, Exception) and result.from_cache) else "done",
+                 f"{label}{cache_tag}: {items} items in {_fmt_s(elapsed)}", 60.0, {"row": row})
+
+        instr_batch = extract_schedules_batch(instr_tasks, _instr_progress)
+
+        for idx, sched_label in enumerate(instr_schedules):
+            pdf_path = instr_splits_dir / f"{sched_label}.pdf"
+            if not pdf_path.exists() or sched_label == "Unclassified":
+                continue
+            result = instr_batch.get(sched_label)
+            if result is None:
+                result = ExtractResult(records=[], items=0, elapsed_s=0.0, from_cache=False)
             instr_extraction[sched_label] = result.records
             total_instr_items += result.items
             if result.from_cache:

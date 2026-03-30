@@ -1,45 +1,88 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "FRY9C Instruction Line Item",
-  "description": "Schema for extracting instruction text for a single line item from an FRY9C instruction document. Each entry pairs a line item reference with its full regulatory instruction text, enabling matching back to the corresponding form line item via MDRM code.",
+  "description": "Schema for extracting instruction text for a single line item from an FRY9C instruction document. Each entry pairs a line item reference with its full regulatory instruction text for matching to the form.",
   "type": "object",
   "properties": {
     "line_item_number": {
       "type": "string",
-      "description": "The line item reference number this instruction applies to, exactly as it appears. Examples: '1.a.(1)(a)', '5.d.(6)', '7.c.(2)', 'Item 1.a', 'Memorandum item 7'. Preserve the exact formatting to enable matching to the form."
+      "description": "The line item reference number this instruction applies to, exactly as printed in the heading. Match the bold heading format: 'Item 1.a.(1)(a)', 'Memorandum item M.7.k.', or just '1.a.(1)(a)'. Preserve all dots, parentheses, and the 'Item' or 'Memorandum item' prefix when present. Use consistent formatting to allow matching back to the form's line_item_number field."
     },
     "mdrm_code": {
-      "anyOf": [{"type": "string"}, {"type": "null"}],
-      "description": "The MDRM identifier code referenced in the instruction text, if present. This is a 4-character alphanumeric code (e.g., '4435', 'B488', 'HT69'). Some instruction sections reference the MDRM explicitly; others do not. Null if no MDRM code is mentioned."
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The 4-character MDRM code referenced in the instruction, if explicitly mentioned. Examples: '4435', 'B488', 'HT69'. Return null if the instruction does not cite an MDRM code."
     },
     "mdrm_prefix": {
-      "anyOf": [{"type": "string"}, {"type": "null"}],
-      "description": "The prefix before the MDRM code (e.g., 'BHCK', 'BHDM'), if mentioned in the instruction text. Null if not referenced."
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The prefix before the MDRM code (e.g. 'BHCK', 'BHDM'), if mentioned. Return null if not referenced."
     },
     "line_item_title": {
       "type": "string",
-      "description": "The short title or name of the line item as stated in the instruction heading. Examples: 'Interest and fee income on loans', 'Loans secured by 1-4 family residential properties', 'Net income (loss)'. This is typically the bold or emphasized text at the start of the instruction section."
+      "description": "The short title of the line item \u2014 the bolded or emphasised text at the start of the instruction section. Examples: 'Interest and fee income on loans', 'Loans secured by 1-4 family residential properties', 'Net income (loss)'. Do not include the reference number itself."
     },
     "instruction_text": {
       "type": "string",
-      "description": "The complete instruction text for this line item. Include all paragraphs, guidance, definitions, cross-references to other schedules, and reporting rules. Preserve the full text as written. This is the primary content that banks use to understand what and how to report for this field."
+      "description": "The complete instruction text for this line item. Include all paragraphs, bullet points, include/exclude lists, cross-references, definitions, and reporting rules. Do not truncate or summarise \u2014 capture the full text as written. This is the authoritative guidance used by bank compliance teams."
     },
     "schedule_name": {
       "type": "string",
-      "description": "The schedule this instruction belongs to. Examples: 'Schedule HI', 'Schedule HC-B', 'Schedule HC-R'. Use the official schedule designation from the page header."
+      "description": "The schedule this instruction belongs to, from the page header. Examples: 'Schedule HI', 'Schedule HC-B', 'Schedule HC-R'. Use the official designation, including any Part qualifier if present."
     },
     "cross_references": {
-      "anyOf": [{"type": "array", "items": {"type": "string"}}, {"type": "null"}],
-      "description": "References to other schedules, line items, or glossary entries mentioned in the instruction text. Examples: ['Schedule HI-B, Part II, item 7', 'Glossary entry for Allowance for Credit Losses', 'Schedule HC, item 12']. Null if no cross-references."
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "All references to other schedules, line items, or glossary entries cited in the instruction text. Examples: ['Schedule HI-B, Part II, item 7', 'Glossary entry for Allowance for Credit Losses', 'Schedule HC, item 12']. Capture them as separate list elements. Return null if none."
     },
     "reporting_guidance": {
-      "anyOf": [{"type": "string"}, {"type": "null"}],
-      "description": "Any specific reporting conditions, thresholds, or exceptions mentioned. Examples: 'Report only if total consolidated assets are $5 billion or more', 'Not applicable for savings and loan holding companies', 'Report on a calendar year-to-date basis'. Null if no special reporting conditions."
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Any reporting conditions, filer-type restrictions, or thresholds mentioned. Examples: 'Report only if total consolidated assets are $5 billion or more', 'Not applicable for savings and loan holding companies', 'Report on a calendar year-to-date basis'. Return null if no special conditions apply."
     },
     "effective_date": {
-      "anyOf": [{"type": "string"}, {"type": "null"}],
-      "description": "The effective date of this instruction version, typically shown in the page footer. Format: MM/YYYY. Examples: '03/2024', '12/2024'. Null if not visible."
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The effective date shown in the page footer, in MM/YYYY format. Examples: '03/2024', '12/2024'. Return null if not visible on the page."
     }
   },
-  "required": ["line_item_number", "line_item_title", "instruction_text", "schedule_name"]
+  "required": [
+    "line_item_number",
+    "line_item_title",
+    "instruction_text",
+    "schedule_name"
+  ]
 }
