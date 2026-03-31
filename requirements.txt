@@ -4,18 +4,11 @@ uvicorn[standard]==0.34.0
 python-multipart==0.0.22
 aiofiles==25.1.0
 
-# LlamaCloud — new unified SDK (replaces deprecated llama-cloud-services)
+# LlamaCloud SDK
 llama-cloud>=1.0
-
-# LlamaIndex utilities (embeddings, llms) — kept for optional LlamaIndex integration
-llama-index-core==0.14.19
-llama-index-llms-azure-openai==0.5.3
-llama-index-embeddings-azure-openai==0.5.2
 
 # PDF processing
 pypdf==6.9.2
-
-# Async utilities
 
 # Utilities
 python-dotenv==1.2.2
