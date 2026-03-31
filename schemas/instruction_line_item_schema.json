@@ -84,5 +84,6 @@
     "line_item_title",
     "instruction_text",
     "schedule_name"
-  ]
+  ],
+  "additionalProperties": false
 }

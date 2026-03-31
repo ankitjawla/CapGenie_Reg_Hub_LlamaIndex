@@ -54,25 +54,44 @@ _VALID_MODES = {"FAST", "BALANCED", "MULTIMODAL", "PREMIUM"}
 
 FORM_SYSTEM_PROMPT = (
     "You are a regulatory data extraction specialist. Extract every line item from this "
-    "FR Y-9C form schedule exactly as printed. Preserve the exact reference number "
-    "formatting including dots, parentheses, and memoranda prefixes (e.g. 'M.'). "
-    "Include all rows — individual items and totals alike. Do not skip footnote-gated items."
+    "FR Y-9C form schedule exactly as printed.\n\n"
+    "CRITICAL — line_item_number rules:\n"
+    "  - Every line_item_number MUST be the full hierarchical reference number, never a bare "
+    "sub-component. Sub-items inherit their parent prefix.\n"
+    "    CORRECT: '5.b.', '5.b.(1)', '10.b.'\n"
+    "    WRONG:   'b.', '(1)'\n"
+    "  - Preserve exact formatting: dots, parentheses, and memoranda prefixes (e.g. 'M.7.k.').\n"
+    "  - The line_item_number is ONLY the short alphanumeric reference (e.g. '1.', '5.b.', "
+    "'M.4.'). It is NEVER the description text. If a row has no printed reference number, "
+    "look at the indentation and context to reconstruct it from the parent hierarchy.\n"
+    "  - Section headers and schedule titles are NOT line items. Do not extract them.\n\n"
+    "Include all rows: individual items, totals, subtotals, and memoranda items alike. "
+    "Do not skip footnote-gated or threshold-gated items."
 )
 
 INSTRUCTION_SYSTEM_PROMPT = (
     "You are a regulatory compliance analyst. Extract structured instruction entries from "
-    "this FR Y-9C instruction schedule. Each entry starts with a bold heading such as "
-    "'Item 1.a.' or 'Line Item M9(g)'. Extract only top-level instruction headings — do not "
-    "decompose include/exclude sub-lists into separate items. Capture the full instruction "
-    "text for each heading without truncation."
+    "this FR Y-9C instruction schedule.\n\n"
+    "Rules:\n"
+    "  - Each instruction entry starts with a bold or emphasized heading such as 'Item 1.a.', "
+    "'Line Item 5(b)', or 'Memorandum item M.4.'. Extract one record per heading.\n"
+    "  - The line_item_number must be ONLY the reference from the heading "
+    "(e.g. 'Line Item 5(b)', 'Item 1.a.', 'Memorandum item M.4.'). "
+    "Preserve the prefix ('Line Item', 'Item', 'Memorandum item') exactly as printed.\n"
+    "  - Do NOT concatenate descriptive text into the line_item_number field. "
+    "The reference number and title are separate fields.\n"
+    "  - Extract EVERY numbered line item instruction, including memoranda items (M.1, M.2, etc.) "
+    "and sub-items (1.a, 1.a.(1), etc.). Do not skip items even if their instruction text "
+    "is short or simply refers to another item.\n"
+    "  - Capture the full instruction text for each heading without truncation."
 )
 
 
 def resolve_extract_mode() -> str:
-    """Return the extraction mode from env; defaults to MULTIMODAL."""
-    mode = os.getenv("LLAMA_EXTRACT_MODE", "MULTIMODAL").strip().upper()
+    """Return the extraction mode from env; defaults to BALANCED."""
+    mode = os.getenv("LLAMA_EXTRACT_MODE", "BALANCED").strip().upper()
     if mode not in _VALID_MODES:
-        mode = "MULTIMODAL"
+        mode = "BALANCED"
     return mode
 
 
@@ -95,17 +114,14 @@ def resolve_extract_model() -> str:
 
 def _effective_mode() -> str:
     """
-    Return the mode that will actually be used:
-    - PREMIUM when ``LLAMA_EXTRACT_MODEL`` is explicitly set (extract model implies PREMIUM)
-    - PREMIUM when ``LLAMA_EXTRACT_MODE=PREMIUM`` is explicitly set
-    - Otherwise → MULTIMODAL (LlamaCloud default; good for visually-rich FR Y-9C schedules)
+    Return the mode that will actually be used.
+    Defaults to BALANCED (proven best for FRY9C dense tables with GPT-4.1).
+    Override with LLAMA_EXTRACT_MODE env var.
     """
-    if os.environ.get("LLAMA_EXTRACT_MODEL", "").strip():
-        return "PREMIUM"
     configured = os.getenv("LLAMA_EXTRACT_MODE", "").strip().upper()
-    if configured == "PREMIUM":
-        return "PREMIUM"
-    return resolve_extract_mode()
+    if configured in _VALID_MODES:
+        return configured
+    return "BALANCED"
 
 
 def build_extract_config(kind: Literal["form", "instruction"]) -> dict:
@@ -131,13 +147,13 @@ def build_extract_config(kind: Literal["form", "instruction"]) -> dict:
         "confidence_scores": True,
         "cite_sources": True,
         "num_pages_context": 1,
-        "chunk_mode": "PAGE" if kind == "form" else "SECTION",
+        "chunk_mode": "SECTION",
         "system_prompt": system_prompt,
     }
 
-    if mode == "PREMIUM":
-        cfg["extract_model"] = resolve_extract_model()
-        cfg["parse_model"] = LLAMACLOUD_DEFAULT_PARSE_MODEL
+    model = os.environ.get("LLAMA_EXTRACT_MODEL", "").strip()
+    if model:
+        cfg["extract_model"] = model
 
     return cfg
 

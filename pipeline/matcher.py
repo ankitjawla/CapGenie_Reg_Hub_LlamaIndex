@@ -23,7 +23,13 @@ def normalize_ref(ref: str) -> str:
     Convert form-style refs (``1.a.(1)(a)``) and instruction-style refs
     (``1(a)(1)(a)``) to a single canonical form for matching.
     """
-    s = ref.strip().rstrip(".")
+    s = ref.strip()
+    # Strip common instruction-style prefixes
+    for prefix in ("Line Item ", "Line item ", "Item ", "Memorandum item ", "Memorandum Item "):
+        if s.startswith(prefix):
+            s = s[len(prefix):]
+            break
+    s = s.rstrip(".")
 
     tokens: list[tuple[str, str]] = []
     i = 0
@@ -32,7 +38,11 @@ def normalize_ref(ref: str) -> str:
         if c == ".":
             i += 1
         elif c == "(":
-            j = s.index(")", i)
+            try:
+                j = s.index(")", i)
+            except ValueError:
+                i += 1
+                continue
             tokens.append(("paren", s[i + 1 : j]))
             i = j + 1
         elif c.isdigit():
@@ -145,6 +155,7 @@ def match_schedule(
         match_type = "exact"
 
         if not instr:
+            # Try parent fallback (e.g. form "1.a.(1)" → instruction "1.a")
             candidate = norm
             while candidate:
                 parent = _find_parent_ref(candidate)
@@ -153,6 +164,16 @@ def match_schedule(
                     match_type = f"parent:{parent}"
                     break
                 candidate = parent
+
+        if not instr:
+            # Try child fallback (e.g. form "1" → instruction "1.a")
+            # Find the first instruction ref that starts with this ref as a prefix
+            prefix = norm + "."
+            for instr_ref in sorted(instr_lookup):
+                if instr_ref.startswith(prefix):
+                    instr = instr_lookup[instr_ref]
+                    match_type = f"child:{instr_ref}"
+                    break
 
         title = None
         text = None

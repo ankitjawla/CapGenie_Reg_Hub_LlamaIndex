@@ -77,7 +77,7 @@ class ExtractResult:
 
 
 def _parse_tier() -> str:
-    return os.getenv("FRY9C_PARSE_TIER", "agentic").strip().lower()
+    return os.getenv("FRY9C_PARSE_TIER", "fast").strip().lower()
 
 
 def _parse_version() -> str:
