@@ -13,7 +13,7 @@ The FRY9C reference package (Extraction Guide, walkthrough, sample PDFs/JSON) is
 | Area | Improvement |
 |---|---|
 | SDK | Migrated from deprecated `llama-cloud-services` → `llama-cloud>=1.0` (AsyncLlamaCloud) |
-| Parse | **Agentic tier** by default (`FRY9C_PARSE_TIER=agentic`); change to `cost_effective`/`fast` to save credits |
+| Parse | Default **`fast`** (`FRY9C_PARSE_TIER`); use `agentic` or `cost_effective` when you need higher parse accuracy |
 | Extract mode | **PREMIUM** when an extract model is explicitly configured; **MULTIMODAL** (default) otherwise |
 | Extract model | `LLAMA_EXTRACT_MODEL` → `AZURE_OPENAI_DEPLOYMENT` → `gpt-5.4` (if Azure endpoint+key set) → `openai-gpt-4-1` |
 | Accuracy | `confidence_scores=True`, `cite_sources=True`, `use_reasoning=True`, `high_resolution_mode=True` |
@@ -53,7 +53,7 @@ uvicorn app:app --reload
 | `LLAMA_CLOUD_API_KEY` | Yes | LlamaCloud API key. Also accepts `LLAMA_PARSE_API_KEY` or legacy `LLAMA_API_KEY`. |
 | `LLAMA_EXTRACT_MODEL` | No | Override extract model / deployment (e.g. `gpt-5.4` on Azure or `openai-gpt-4-1` on LlamaCloud). |
 | `LLAMA_EXTRACT_MODE` | No | Override extraction mode: `PREMIUM`, `MULTIMODAL` (default), `BALANCED`, `FAST`. |
-| `FRY9C_PARSE_TIER` | No | LlamaParse tier: `agentic` (default), `cost_effective`, `fast`. |
+| `FRY9C_PARSE_TIER` | No | LlamaParse tier: **`fast`** (default), `cost_effective`, `agentic`. |
 | `FRY9C_PARSE_VERSION` | No | LlamaParse model version, default `latest`. |
 | `FRY9C_SPLIT_MODE` | No | Schedule classification: `hybrid` (default) or `footer_only`. |
 | `CACHE_MAX_AGE_DAYS` | No | Evict cache entries older than this many days. `0` = keep forever (default). |

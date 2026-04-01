@@ -41,6 +41,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+def _use_reasoning() -> bool:
+    """LlamaExtract use_reasoning flag (default True). Set LLAMA_EXTRACT_USE_REASONING=false to disable."""
+    v = os.getenv("LLAMA_EXTRACT_USE_REASONING", "true").strip().lower()
+    return v not in ("0", "false", "no", "off")
+
+
 # Default LlamaCloud extract model slug for PREMIUM mode.
 # Valid options: "openai-gpt-4-1", "openai-gpt-5-mini", "openai-gpt-5"
 # NOTE: Azure deployment names (e.g. "gpt-5.4") are NOT valid here.
@@ -130,7 +136,7 @@ def build_extract_config(kind: Literal["form", "instruction"]) -> dict:
 
     Uses PREMIUM mode (with openai-gpt-4-1 + anthropic-haiku-4.5) when
     ``LLAMA_EXTRACT_MODEL`` or ``LLAMA_EXTRACT_MODE=PREMIUM`` is configured,
-    otherwise MULTIMODAL.
+    otherwise the mode from LLAMA_EXTRACT_MODE (default BALANCED).
 
     Differences by kind:
       - form:        chunk_mode=PAGE (table-heavy; each page processed independently)
@@ -143,7 +149,7 @@ def build_extract_config(kind: Literal["form", "instruction"]) -> dict:
         "extraction_target": "PER_TABLE_ROW",
         "extraction_mode": mode,
         "high_resolution_mode": True,
-        "use_reasoning": True,
+        "use_reasoning": _use_reasoning(),
         "confidence_scores": True,
         "cite_sources": True,
         "num_pages_context": 1,

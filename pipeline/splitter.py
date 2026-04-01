@@ -216,3 +216,39 @@ def split_pdf_by_schedule(
 def get_schedule_names(mapping: dict[str, list[int]]) -> list[str]:
     """Return only the ``Schedule_*`` labels from a page-mapping dict."""
     return sorted(k for k in mapping if k.startswith("Schedule_"))
+
+
+def build_split_diagnostics(
+    parsed_text: str,
+    schedule_page_mapping: dict[str, list[int]],
+    *,
+    max_snippet_pages: int = 15,
+    max_pages_in_list: int = 500,
+) -> dict:
+    """
+    Summarize Unclassified pages for debugging split quality.
+
+    *schedule_page_mapping* must match ``split_pdf_by_schedule`` output: values are
+    **1-based** page numbers per label.
+    """
+    text_pages = parsed_text.split("\n\n---\n\n")
+    unc_1based = sorted(schedule_page_mapping.get("Unclassified") or [])
+    listed = unc_1based[:max_pages_in_list]
+    truncated = len(unc_1based) > len(listed)
+
+    snippets: list[dict[str, str | int]] = []
+    for p1 in unc_1based[:max_snippet_pages]:
+        idx = p1 - 1
+        if 0 <= idx < len(text_pages):
+            t = text_pages[idx]
+            head = t[:120].replace("\n", " ").strip()
+            tail_chunk = t.strip()[-400:] if len(t) > 400 else t.strip()
+            tail = tail_chunk.replace("\n", " ").strip()
+            snippets.append({"page": p1, "head": head, "tail": tail})
+
+    return {
+        "unclassified_count": len(unc_1based),
+        "unclassified_pages_1based": listed,
+        "unclassified_pages_truncated": truncated,
+        "unclassified_snippets": snippets,
+    }

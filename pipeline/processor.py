@@ -2,7 +2,7 @@
 Pipeline orchestrator for FRY9C extraction.
 
 Runs all 5 steps in sequence for a given job:
-  1. Parse  – LlamaParse (agentic tier by default; versioned cache)
+  1. Parse  – LlamaParse (tier from FRY9C_PARSE_TIER, default fast; versioned cache)
   2. Split  – per-schedule PDFs (hybrid header+footer or footer_only)
   3. Extract Forms     – LlamaExtract with form schema (cached per schedule)
   4. Extract Instructions – LlamaExtract with instruction schema (cached)
@@ -30,7 +30,8 @@ from pipeline.extract_settings import (
     resolve_extract_model,
 )
 from pipeline.matcher import build_combined_output, save_combined_output
-from pipeline.splitter import get_schedule_names, split_pdf_by_schedule
+from pipeline.parse_config import effective_parse_tier, effective_parse_version
+from pipeline.splitter import build_split_diagnostics, get_schedule_names, split_pdf_by_schedule
 
 # ---------------------------------------------------------------------------
 # Progress event model
@@ -130,7 +131,6 @@ def run_pipeline(
     for d in (form_splits_dir, instr_splits_dir, extractions_dir, results_dir):
         d.mkdir(parents=True, exist_ok=True)
 
-    import os
     form_size_mb = round(os.path.getsize(form_pdf) / 1_048_576, 2)
     instr_size_mb = round(os.path.getsize(instr_pdf) / 1_048_576, 2)
 
@@ -143,8 +143,8 @@ def run_pipeline(
         emit(1, "Parse", "", "running", f"Parsing Form PDF ({form_size_mb} MB) with LlamaParse…", 0.0, {
             "file": form_pdf.name,
             "size_mb": form_size_mb,
-            "api": f"LlamaParse (tier={os.environ.get('FRY9C_PARSE_TIER','agentic')})",
-            "what": "Per FRY9C Extraction Guide: LlamaParse agentic tier returns one page per document. Set FRY9C_PARSE_TIER=cost_effective or fast to reduce credit usage.",
+            "api": f"LlamaParse (tier={effective_parse_tier()})",
+            "what": "LlamaParse returns one text segment per PDF page (joined with ---). Default tier is fast; set FRY9C_PARSE_TIER=agentic or cost_effective for higher accuracy.",
         })
 
         form_parse = parse_pdf(form_pdf)
@@ -180,7 +180,7 @@ def run_pipeline(
                      "from_cache": instr_parse.from_cache,
                  },
                  "total_elapsed_s": step_elapsed,
-                 "what": "LlamaParse reads each PDF page (markdown + fast_mode by default). Pages are output in sequence separated by '---' markers.",
+                 "what": "Per-page text is concatenated with '---' separators (tier from FRY9C_PARSE_TIER, default fast).",
              })
 
         # ==================================================================
@@ -204,6 +204,19 @@ def run_pipeline(
              })
 
         instr_mapping = split_pdf_by_schedule(instr_parse.text, instr_pdf, instr_splits_dir)
+
+        form_split_diag = build_split_diagnostics(form_parse.text, form_mapping)
+        instr_split_diag = build_split_diagnostics(instr_parse.text, instr_mapping)
+        split_diag_doc = {
+            "parse_tier": effective_parse_tier(),
+            "parse_version": effective_parse_version(),
+            "split_mode": os.environ.get("FRY9C_SPLIT_MODE", "hybrid").strip().lower(),
+            "form": form_split_diag,
+            "instructions": instr_split_diag,
+        }
+        split_diag_path = splits_dir / "split_diagnostics.json"
+        with open(split_diag_path, "w") as fh:
+            json.dump(split_diag_doc, fh, indent=2)
 
         form_schedules = get_schedule_names(form_mapping)
         instr_schedules = get_schedule_names(instr_mapping)
@@ -230,6 +243,9 @@ def run_pipeline(
                  "form_other_sections": [k for k in form_mapping if not k.startswith("Schedule_")],
                  "instr_other_sections": [k for k in instr_mapping if not k.startswith("Schedule_")],
                  "total_elapsed_s": step_elapsed,
+                 "split_diagnostics_file": "splits/split_diagnostics.json",
+                 "form_unclassified_pages": form_split_diag["unclassified_count"],
+                 "instr_unclassified_pages": instr_split_diag["unclassified_count"],
              })
 
         # ==================================================================
@@ -519,7 +535,14 @@ def run_pipeline(
             "instr_pages": instr_parse.pages,
             "extract_model": resolve_extract_model(),
             "extract_mode": _form_cfg_final.get("extraction_mode"),
-            "parse_tier": os.environ.get("FRY9C_PARSE_TIER", "agentic").strip().lower(),
+            "parse_tier": effective_parse_tier(),
+            "parse_version": effective_parse_version(),
+            "use_reasoning": _form_cfg_final.get("use_reasoning"),
+            "split_diagnostics": {
+                "file": "splits/split_diagnostics.json",
+                "form_unclassified_pages": form_split_diag["unclassified_count"],
+                "instr_unclassified_pages": instr_split_diag["unclassified_count"],
+            },
             "schedules": schedule_summary,
             "total_line_items": total_items,
             "total_matched": total_matched,

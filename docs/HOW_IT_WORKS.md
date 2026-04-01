@@ -70,7 +70,7 @@ All logic is in **`run_pipeline(job_dir, form_pdf, instr_pdf, on_progress=...)`*
 ### Step 1 — Parse (LlamaParse)
 
 - **Input:** Full Form PDF, then full Instruction PDF.
-- **Service:** LlamaCloud **parsing** API (`AsyncLlamaCloud.parsing.parse`), default tier **`agentic`** (override with `FRY9C_PARSE_TIER`).
+- **Service:** LlamaCloud **parsing** API (`AsyncLlamaCloud.parsing.parse`), default tier **`fast`** (override with `FRY9C_PARSE_TIER`; use `agentic` or `cost_effective` for higher accuracy).
 - **Output:** One text blob per document. Pages are concatenated with a separator (`\n\n---\n\n`) so the splitter can treat each page independently.
 - **Cache:** Under `.cache/parse/`, keyed by **file hash + parse options** (tier, version, Azure-related fingerprint). Re-running the same PDF with the same options skips the API call.
 
@@ -80,6 +80,7 @@ All logic is in **`run_pipeline(job_dir, form_pdf, instr_pdf, on_progress=...)`*
 - **Logic:** `pipeline/splitter.py` classifies **each page** into a schedule label (e.g. `Schedule_HI`, `Schedule_HC-B`) or special buckets like `Cover`, `Unclassified`.
 - **Modes:** `FRY9C_SPLIT_MODE=hybrid` (default: header region + footer patterns) or `footer_only` (package-style footers only).
 - **Output:** Subfolders under `job_dir/splits/` with one small PDF per schedule for **form** and **instruction** sides (`form_splits/`, `instr_splits/`).
+- **Diagnostics:** `job_dir/splits/split_diagnostics.json` lists `Unclassified` page counts, optional 1-based page lists, and short text snippets for debugging split quality.
 
 ### Step 3 — Extract forms (LlamaExtract)
 
@@ -107,12 +108,12 @@ Settings are centralized in **`pipeline/extract_settings.py`** and summarized in
 
 Rough resolution order:
 
-1. **`LLAMA_EXTRACT_MODEL`** — explicit deployment name or LlamaCloud PREMIUM slug.
-2. **`AZURE_OPENAI_DEPLOYMENT`** — your Azure OpenAI deployment name.
-3. If **`AZURE_OPENAI_ENDPOINT`** and an API key are set but deployment is empty, the app defaults the deployment name to **`gpt-5.4`** (configurable in code as `DEFAULT_AZURE_DEPLOYMENT`).
-4. If none of the above apply, a LlamaCloud-hosted fallback slug may be used when **PREMIUM** mode is active.
+1. **`LLAMA_EXTRACT_MODEL`** — if set, a valid LlamaCloud extract model slug (e.g. `openai-gpt-4-1`) is passed to the API.
+2. **`LLAMA_EXTRACT_MODE`** — `FAST`, `BALANCED`, `MULTIMODAL`, or `PREMIUM`. When unset, the pipeline uses **BALANCED** (see `pipeline/extract_settings.py`).
+3. **`LLAMA_EXTRACT_USE_REASONING`** — `true`/`false`; toggles LlamaExtract `use_reasoning` (default `true`).
+4. Azure OpenAI env vars are **not** used to configure LlamaCloud extraction in this app; they are for other optional Azure usage.
 
-**Mode:** When Azure credentials (endpoint + key) are present, or a model/deployment is set, extraction typically runs in **PREMIUM** mode so `extract_model` can be set. Otherwise **`LLAMA_EXTRACT_MODE`** defaults to **MULTIMODAL** (see code for exact rules).
+**Note:** Setting `LLAMA_EXTRACT_MODEL` does not automatically switch mode in code; choose `LLAMA_EXTRACT_MODE=PREMIUM` if your LlamaCloud project requires it.
 
 Chunking and context are tuned per **kind** (form vs instruction): e.g. **PAGE** vs **SECTION** chunk mode, and `num_pages_context` may vary by schedule class (e.g. wider context for some HC schedules).
 
@@ -148,7 +149,7 @@ Example: `results/<job_id>/`
 |----------|------|
 | `LLAMA_CLOUD_API_KEY` / `LLAMA_API_KEY` | LlamaCloud API key for parse + extract |
 | `AZURE_OPENAI_*` | Azure OpenAI endpoint, key, deployment, API version — drive PREMIUM + deployment defaults |
-| `FRY9C_PARSE_TIER` | LlamaParse tier: `agentic`, `cost_effective`, `fast` |
+| `FRY9C_PARSE_TIER` | LlamaParse tier: default **`fast`**; also `agentic`, `cost_effective` |
 | `FRY9C_SPLIT_MODE` | `hybrid` or `footer_only` |
 | `CACHE_MAX_AGE_DAYS` | Optional cache staleness window |
 

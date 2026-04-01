@@ -1,7 +1,7 @@
 """
 PDF extraction utilities using the LlamaCloud SDK (llama-cloud>=1.0).
 
-LlamaParse: AsyncLlamaCloud.parsing.parse()  — agentic tier, per-page text.
+LlamaParse: AsyncLlamaCloud.parsing.parse() — tier from FRY9C_PARSE_TIER (default fast), per-page text.
 LlamaExtract: AsyncLlamaCloud.extraction.extract() — concurrent across schedules.
 
 Both steps are backed by a versioned disk cache (parse tier/version + extract config).
@@ -36,6 +36,7 @@ from pipeline.extract_settings import (
     extract_config_fingerprint,
     num_pages_context_for_schedule,
 )
+from pipeline.parse_config import effective_parse_tier, effective_parse_version
 
 load_dotenv()
 
@@ -76,16 +77,8 @@ class ExtractResult:
     from_cache: bool
 
 
-def _parse_tier() -> str:
-    return os.getenv("FRY9C_PARSE_TIER", "fast").strip().lower()
-
-
-def _parse_version() -> str:
-    return os.getenv("FRY9C_PARSE_VERSION", "latest").strip()
-
-
 async def _parse_async(pdf_path: Path) -> ParseResult:
-    """Parse *pdf_path* via LlamaCloud async client. Uses agentic tier by default."""
+    """Parse *pdf_path* via LlamaCloud async client (tier from effective_parse_tier())."""
     from llama_cloud import AsyncLlamaCloud  # type: ignore[import]
 
     t0 = time.perf_counter()
@@ -110,8 +103,8 @@ async def _parse_async(pdf_path: Path) -> ParseResult:
 
     result = await client.parsing.parse(
         file_id=file_obj.id,
-        tier=_parse_tier(),
-        version=_parse_version(),
+        tier=effective_parse_tier(),
+        version=effective_parse_version(),
         expand=["text"],
     )
 
@@ -136,9 +129,11 @@ async def _parse_async(pdf_path: Path) -> ParseResult:
 
 def parse_pdf(pdf_path: Path) -> ParseResult:
     """
-    Parse *pdf_path* with LlamaParse (agentic tier by default).
+    Parse *pdf_path* with LlamaParse.
 
-    Set ``FRY9C_PARSE_TIER`` to ``cost_effective`` or ``fast`` for cheaper parsing.
+    Default tier is ``fast`` (see ``pipeline.parse_config.effective_parse_tier``).
+    Set ``FRY9C_PARSE_TIER`` to ``agentic`` or ``cost_effective`` when you need
+    different accuracy/cost tradeoffs.
     """
     return asyncio.run(_parse_async(pdf_path))
 

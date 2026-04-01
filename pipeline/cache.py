@@ -24,6 +24,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from pipeline.parse_config import effective_parse_tier, effective_parse_version
+
 CACHE_DIR = Path(__file__).parent.parent / ".cache"
 PARSE_CACHE = CACHE_DIR / "parse"
 EXTRACT_CACHE = CACHE_DIR / "extract"
@@ -71,10 +73,10 @@ def parse_options_fingerprint() -> str:
     Stable token for current LlamaParse options (invalidates parse cache when changed).
 
     Encodes: parse tier, parse version, and actual Azure endpoint value (if set).
-    Set FRY9C_PARSE_TIER to change tier (default: agentic).
+    Defaults match pipeline.parse_config (same as the live parse API call).
     """
-    tier = os.getenv("FRY9C_PARSE_TIER", "agentic").strip().lower()
-    version = os.getenv("FRY9C_PARSE_VERSION", "latest").strip()
+    tier = effective_parse_tier()
+    version = effective_parse_version()
     ep = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
     dep = os.getenv("AZURE_OPENAI_DEPLOYMENT", "").strip()
     ver = os.getenv("AZURE_OPENAI_API_VERSION", "").strip()
